@@ -64,11 +64,12 @@ export interface PackingResult {
   sheetsUsed: number;
 }
 
-interface FreeRect {
-  x: number;
+export interface Shelf {
   y: number;
-  width: number;
   height: number;
+  startX: number;
+  endX: number;
+  cursorX: number;
 }
 
 const KERF = 5;
@@ -85,126 +86,125 @@ export function packPieces(pieces: Piece[], sheetWidth: number, sheetHeight: num
     return { placed: [], notPlaced: [], sheetsUsed: 0 };
   }
 
-  // Sort pieces by area descending, then max dimension descending
-  allPieces.sort((a, b) => {
-    const areaA = a.width * a.height;
-    const areaB = b.width * b.height;
-    if (areaB !== areaA) return areaB - areaA;
-    return Math.max(b.width, b.height) - Math.max(a.width, a.height);
-  });
+  // Sort pieces by height descending, then width descending
+  allPieces.sort((a, b) => b.height - a.height || b.width - a.width);
 
   const placed: PlacedPiece[] = [];
   const remainingPieces = [...allPieces];
 
   let currentSheet = 1;
-  const MAX_SHEETS = 100;
+  const MAX_SHEETS = 200;
 
   while (remainingPieces.length > 0 && currentSheet <= MAX_SHEETS) {
-    let freeRects: FreeRect[] = [
-      { x: 0, y: 0, width: sheetWidth, height: sheetHeight }
-    ];
+    const placedOnSheet: PlacedPiece[] = [];
+    const shelves: Shelf[] = [];
 
-    let placedOnThisSheet = 0;
-    let i = 0;
+    const tryPlacePiece = (piece: Piece): boolean => {
+      const pW = piece.width;
+      const pH = piece.height;
 
-    while (i < remainingPieces.length) {
-      const piece = remainingPieces[i];
-      let bestRectIndex = -1;
-      let bestShortSideFit = Infinity;
-      let bestLongSideFit = Infinity;
+      // 1. Try to fit in an existing shelf on this sheet
+      for (const shelf of shelves) {
+        if (pH <= shelf.height && (shelf.cursorX + pW) <= shelf.endX) {
+          const px = shelf.cursorX;
+          const py = shelf.y;
 
-      for (let r = 0; r < freeRects.length; r++) {
-        const rect = freeRects[r];
-        const wNeeded = piece.width;
-        const hNeeded = piece.height;
+          const collision = placedOnSheet.some(other => 
+            !(px >= other.x + other.width + KERF ||
+              px + pW + KERF <= other.x ||
+              py >= other.y + other.height + KERF ||
+              py + pH + KERF <= other.y)
+          );
 
-        if (rect.width >= wNeeded && rect.height >= hNeeded) {
-          const leftoverX = rect.width - wNeeded;
-          const leftoverY = rect.height - hNeeded;
-          const shortSideFit = Math.min(leftoverX, leftoverY);
-          const longSideFit = Math.max(leftoverX, leftoverY);
-
-          if (shortSideFit < bestShortSideFit || (shortSideFit === bestShortSideFit && longSideFit < bestLongSideFit)) {
-            bestShortSideFit = shortSideFit;
-            bestLongSideFit = longSideFit;
-            bestRectIndex = r;
+          if (!collision && (px + pW) <= sheetWidth && (py + pH) <= sheetHeight) {
+            placedOnSheet.push({ ...piece, x: px, y: py, sheet: currentSheet });
+            shelf.cursorX += pW + KERF;
+            return true;
           }
         }
       }
 
-      if (bestRectIndex >= 0) {
-        const chosenRect = freeRects[bestRectIndex];
-        const px = chosenRect.x;
-        const py = chosenRect.y;
+      // 2. If no existing shelf fit, try opening a new shelf at the bottom of the tallest placed piece
+      let newY = 0;
+      for (const p of placedOnSheet) {
+        if (p.x < pW + KERF) {
+          newY = Math.max(newY, p.y + p.height + KERF);
+        }
+      }
 
-        placed.push({
-          ...piece,
-          x: px,
-          y: py,
-          sheet: currentSheet,
-        });
+      if (newY + pH <= sheetHeight && pW <= sheetWidth) {
+        const collision = placedOnSheet.some(other => 
+          !(0 >= other.x + other.width + KERF ||
+            pW + KERF <= other.x ||
+            newY >= other.y + other.height + KERF ||
+            newY + pH + KERF <= other.y)
+        );
 
-        placedOnThisSheet++;
-        remainingPieces.splice(i, 1);
+        if (!collision) {
+          shelves.push({
+            y: newY,
+            height: pH,
+            startX: 0,
+            endX: sheetWidth,
+            cursorX: pW + KERF,
+          });
+          placedOnSheet.push({ ...piece, x: 0, y: newY, sheet: currentSheet });
+          return true;
+        }
+      }
 
-        const placedW = piece.width + KERF;
-        const placedH = piece.height + KERF;
+      // 3. Try sub-shelves under shorter placed pieces
+      const candidateYLevels = new Set<number>();
+      for (const p of placedOnSheet) {
+        const bottomY = p.y + p.height + KERF;
+        if (bottomY + pH <= sheetHeight) {
+          candidateYLevels.add(bottomY);
+        }
+      }
 
-        const newFreeRects: FreeRect[] = [];
-        for (const rect of freeRects) {
-          const intersects = !(
-            px >= rect.x + rect.width ||
-            px + placedW <= rect.x ||
-            py >= rect.y + rect.height ||
-            py + placedH <= rect.y
+      const sortedYLevels = Array.from(candidateYLevels).sort((a, b) => a - b);
+      for (const candY of sortedYLevels) {
+        for (let testX = 0; testX + pW <= sheetWidth; testX += 10) {
+          const collision = placedOnSheet.some(other => 
+            !(testX >= other.x + other.width + KERF ||
+              testX + pW + KERF <= other.x ||
+              candY >= other.y + other.height + KERF ||
+              candY + pH + KERF <= other.y)
           );
 
-          if (!intersects) {
-            newFreeRects.push(rect);
-            continue;
-          }
-
-          if (py > rect.y && py < rect.y + rect.height) {
-            newFreeRects.push({
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: py - rect.y,
+          if (!collision && testX + pW <= sheetWidth && candY + pH <= sheetHeight) {
+            shelves.push({
+              y: candY,
+              height: pH,
+              startX: testX,
+              endX: sheetWidth,
+              cursorX: testX + pW + KERF,
             });
-          }
-          if (py + placedH > rect.y && py + placedH < rect.y + rect.height) {
-            newFreeRects.push({
-              x: rect.x,
-              y: py + placedH,
-              width: rect.width,
-              height: (rect.y + rect.height) - (py + placedH),
-            });
-          }
-          if (px > rect.x && px < rect.x + rect.width) {
-            newFreeRects.push({
-              x: rect.x,
-              y: rect.y,
-              width: px - rect.x,
-              height: rect.height,
-            });
-          }
-          if (px + placedW > rect.x && px + placedW < rect.x + rect.width) {
-            newFreeRects.push({
-              x: px + placedW,
-              y: rect.y,
-              width: (rect.x + rect.width) - (px + placedW),
-              height: rect.height,
-            });
+            placedOnSheet.push({ ...piece, x: testX, y: candY, sheet: currentSheet });
+            return true;
           }
         }
+      }
 
-        freeRects = filterFreeRects(newFreeRects);
+      return false;
+    };
+
+    let placedInThisPass = 0;
+    let i = 0;
+    while (i < remainingPieces.length) {
+      if (tryPlacePiece(remainingPieces[i])) {
+        placedInThisPass++;
+        remainingPieces.splice(i, 1);
       } else {
         i++;
       }
     }
 
-    if (placedOnThisSheet === 0) {
+    if (placedOnSheet.length > 0) {
+      placed.push(...placedOnSheet);
+    }
+
+    if (placedInThisPass === 0) {
       if (remainingPieces.length > 0) {
         currentSheet++;
         const oversized = remainingPieces.some(p => p.width > sheetWidth || p.height > sheetHeight);
@@ -219,31 +219,4 @@ export function packPieces(pieces: Piece[], sheetWidth: number, sheetHeight: num
 
   const sheetsUsed = placed.length > 0 ? Math.max(...placed.map(p => p.sheet)) : 0;
   return { placed, notPlaced: remainingPieces, sheetsUsed };
-}
-
-function filterFreeRects(rects: FreeRect[]): FreeRect[] {
-  const valid = rects.filter(r => r.width > 5 && r.height > 5);
-  const result: FreeRect[] = [];
-
-  for (let i = 0; i < valid.length; i++) {
-    let isContained = false;
-    for (let j = 0; j < valid.length; j++) {
-      if (i === j) continue;
-      const r1 = valid[i];
-      const r2 = valid[j];
-      if (
-        r1.x >= r2.x &&
-        r1.y >= r2.y &&
-        r1.x + r1.width <= r2.x + r2.width &&
-        r1.y + r1.height <= r2.y + r2.height
-      ) {
-        isContained = true;
-        break;
-      }
-    }
-    if (!isContained) {
-      result.push(valid[i]);
-    }
-  }
-  return result;
 }
