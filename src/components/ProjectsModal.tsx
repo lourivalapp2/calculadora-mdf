@@ -134,7 +134,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
           {savedProjects.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-xs bg-slate-950 rounded-lg border border-dashed border-slate-800">
               <p className="mb-2 font-semibold text-slate-400">Nenhum projeto salvo ainda.</p>
-              <p>Digite o nome do projeto no topo e clique em "Salvar no Navegador".</p>
+              <p>Digite o nome do projeto no topo e clique em "Salvar".</p>
             </div>
           ) : (
             savedProjects.map(proj => {

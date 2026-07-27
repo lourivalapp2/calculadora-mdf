@@ -1553,7 +1553,7 @@ export default function App() {
                 title="Salvar este projeto na memória do navegador"
               >
                 <Save size={14} className="text-amber-400" />
-                <span>Salvar no Navegador</span>
+                <span>Salvar</span>
               </button>
 
               {/* Save/Load JSON Files */}
@@ -2982,7 +2982,7 @@ export default function App() {
             title="Salvar este projeto na memória do navegador"
           >
             <Save size={18} />
-            <span>Salvar no Navegador</span>
+            <span>Salvar</span>
           </button>
 
           <button
