@@ -1546,13 +1546,13 @@ export default function App() {
                 <span>Meus Projetos ({savedProjects.length})</span>
               </button>
 
-              {/* Save Active Project to Browser */}
+              {/* Save Active Project */}
               <button
                 onClick={handleSaveProjectToBrowser}
-                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95"
-                title="Salvar este projeto na memória do navegador"
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
+                title="Salvar este projeto no banco de dados Supabase"
               >
-                <Save size={14} className="text-amber-400" />
+                <Save size={14} className="text-slate-950" />
                 <span>Salvar</span>
               </button>
 
@@ -2979,7 +2979,7 @@ export default function App() {
           <button
             onClick={handleSaveProjectToBrowser}
             className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-5 py-3 rounded-lg text-xs flex items-center justify-center gap-2 shadow-lg hover:shadow-amber-500/20 transition-all active:scale-95 cursor-pointer"
-            title="Salvar este projeto na memória do navegador"
+            title="Salvar este projeto no banco de dados Supabase"
           >
             <Save size={18} />
             <span>Salvar</span>
