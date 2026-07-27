@@ -133,6 +133,7 @@ export default function App() {
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>('c1');
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(defaultFixedExpenses);
   const [hideFixedExpensesInDre, setHideFixedExpensesInDre] = useState<boolean>(true);
+  const [simulateOneUnitPerDay, setSimulateOneUnitPerDay] = useState<boolean>(false);
   const [newFixedExpense, setNewFixedExpense] = useState({ name: '', value: '' });
 
   // Cost Input State: Name, Unit Price, Quantity
@@ -2714,6 +2715,17 @@ export default function App() {
                 />
                 <span>Ocultar Despesas Fixas</span>
               </label>
+
+              {/* Toggle Simular 1 un/dia na DRE */}
+              <label className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded cursor-pointer select-none font-semibold hover:border-slate-600 transition-colors" title="Simular faturamento e custos considerando 1 unidade vendida por dia">
+                <input
+                  type="checkbox"
+                  checked={simulateOneUnitPerDay}
+                  onChange={e => setSimulateOneUnitPerDay(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer"
+                />
+                <span>Calcular 1 un/dia</span>
+              </label>
             </div>
           </div>
 
@@ -2808,7 +2820,8 @@ export default function App() {
             {(() => {
               const activeSc = salesScenarios.find(s => s.id === selectedScenarioId) || salesScenarios[0] || { unitPrice: 0, name: 'Cenário 1' };
               const unitCost = furnitureQty > 0 ? totalCost / furnitureQty : 0;
-              const monthlyProductionCount = furnitureQty * workDaysPerMonth;
+              const dailyUnitsToCalc = simulateOneUnitPerDay ? 1 : furnitureQty;
+              const monthlyProductionCount = dailyUnitsToCalc * workDaysPerMonth;
               const monthlyGrossRevenue = activeSc.unitPrice * monthlyProductionCount;
               const monthlyDirectCost = unitCost * monthlyProductionCount;
               const monthlyGrossProfit = monthlyGrossRevenue - monthlyDirectCost;
@@ -2828,7 +2841,7 @@ export default function App() {
                       <span>DRE - Demonstração do Resultado do Mês</span>
                     </h4>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      {workDaysPerMonth} dias × {furnitureQty} móveis/dia = <strong>{monthlyProductionCount} móveis/mês</strong>
+                      {workDaysPerMonth} dias × {dailyUnitsToCalc} {dailyUnitsToCalc === 1 ? 'móvel' : 'móveis'}/dia = <strong>{monthlyProductionCount} móveis/mês</strong>
                     </span>
                   </div>
 
