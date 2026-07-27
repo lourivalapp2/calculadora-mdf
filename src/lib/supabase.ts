@@ -3,9 +3,9 @@ import { SavedProject } from '../components/ProjectsModal';
 
 const LOCAL_STORAGE_KEY = 'mdf_saved_projects_v1';
 
-// Obtain environment variables for Supabase connection
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Obtain environment variables for Supabase connection (with fallback credentials)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://wqchmksdvuvzbyzgpouy.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_TDeVQJ5ohTUlESN9Inf-Rw_uNYSG8UR';
 
 // Singleton client instance
 export const supabase: SupabaseClient | null =
