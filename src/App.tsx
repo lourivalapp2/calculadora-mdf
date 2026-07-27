@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { packPieces, Piece } from './lib/packing';
+import { packPieces, Piece, EdgeTapeOption, EDGE_TAPE_LABELS, calculatePieceEdgeTapeMeters } from './lib/packing';
 import {
   Plus,
   Trash2,
@@ -112,6 +112,8 @@ export default function App() {
   const [costs, setCosts] = useState<CostItem[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [newPiece, setNewPiece] = useState({ name: '', height: '', width: '', quantity: '1', ab: '' });
+  const [newPieceEdgeTape, setNewPieceEdgeTape] = useState<EdgeTapeOption>('none');
+  const [edgeTapePricePerMeter, setEdgeTapePricePerMeter] = useState<number>(1.50);
   
   // Backing MDF States (Plano de Corte de Fundo - 3mm/6mm)
   const [backPieces, setBackPieces] = useState<Piece[]>([]);
@@ -801,7 +803,15 @@ export default function App() {
   }));
     
   const packingResult = packPieces(piecesToPack, sheetWidth, sheetHeight);
-  const unitCost = costs.reduce((sum, cost) => sum + (cost.unitPrice * cost.quantity), 0);
+
+  // Edge Tape Calculations
+  const totalEdgeTapeMetersUnit = pieces.reduce((sum, p) => sum + calculatePieceEdgeTapeMeters(p) * p.quantity, 0);
+  const totalEdgeTapeMetersBatch = totalEdgeTapeMetersUnit * furnitureQty;
+  const totalEdgeTapeCostBatch = totalEdgeTapeMetersBatch * edgeTapePricePerMeter;
+  const totalEdgeTapeCostUnit = furnitureQty > 0 ? totalEdgeTapeCostBatch / furnitureQty : 0;
+
+  const itemizedUnitCost = costs.reduce((sum, cost) => sum + (cost.unitPrice * cost.quantity), 0);
+  const unitCost = itemizedUnitCost + totalEdgeTapeCostUnit;
   const totalCost = unitCost * furnitureQty;
 
   // Backing Packing Calculation
@@ -896,8 +906,9 @@ export default function App() {
 
     doc.setFont('helvetica', 'normal');
     doc.text(`Chapa MDF: ${sheetWidth} x ${sheetHeight} mm (${sheetWidth/10}x${sheetHeight/10} cm)`, 18, y + 11);
-    doc.text(`Chapas Necessárias: ${packingResult.sheetsUsed} chapa(s)`, 105, y + 11);
-    doc.text(`Qtd. Móveis: ${furnitureQty} un.`, 165, y + 11);
+    doc.text(`Chapas: ${packingResult.sheetsUsed} un.`, 95, y + 11);
+    doc.text(`Fita Borda: ${totalEdgeTapeMetersBatch.toFixed(1)} m`, 130, y + 11);
+    doc.text(`Móveis: ${furnitureQty} un.`, 172, y + 11);
 
     y += 24;
 
@@ -905,7 +916,7 @@ export default function App() {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text('1. LISTA DE PEÇAS, MEDIDAS E QUANTIDADES POR UNIDADE', 14, y);
+    doc.text('1. LISTA DE PEÇAS, MEDIDAS E FITA DE BORDA POR UNIDADE', 14, y);
     y += 5;
 
     // Table Header for Pieces
@@ -913,13 +924,14 @@ export default function App() {
     doc.rect(14, y, pageWidth - 28, 7, 'F');
     doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
-    doc.text('Item', 17, y + 4.8);
-    doc.text('Nome da Peça', 28, y + 4.8);
-    doc.text('Altura (mm / cm)', 76, y + 4.8);
-    doc.text('Largura (mm / cm)', 112, y + 4.8);
-    doc.text('AB (cm)', 146, y + 4.8);
-    doc.text('Qtd Unit.', 164, y + 4.8);
-    doc.text('Qtd Lote', 182, y + 4.8);
+    doc.text('Item', 16, y + 4.8);
+    doc.text('Nome da Peça', 25, y + 4.8);
+    doc.text('Altura', 68, y + 4.8);
+    doc.text('Largura', 96, y + 4.8);
+    doc.text('Fita Borda', 124, y + 4.8);
+    doc.text('AB', 158, y + 4.8);
+    doc.text('Qtd Unit', 172, y + 4.8);
+    doc.text('Qtd Lote', 186, y + 4.8);
 
     y += 7;
 
@@ -939,13 +951,15 @@ export default function App() {
           doc.setFillColor(241, 245, 249);
           doc.rect(14, y, pageWidth - 28, 6, 'F');
         }
-        doc.text(`${idx + 1}`, 17, y + 4.2);
-        doc.text(p.name, 28, y + 4.2);
-        doc.text(`${p.height} mm (${p.height / 10} cm)`, 76, y + 4.2);
-        doc.text(`${p.width} mm (${p.width / 10} cm)`, 112, y + 4.2);
-        doc.text(p.ab !== undefined ? `${p.ab / 10} cm` : '-', 146, y + 4.2);
-        doc.text(`${p.quantity}`, 168, y + 4.2);
-        doc.text(`${p.quantity * furnitureQty}`, 184, y + 4.2);
+        const edgeLabel = EDGE_TAPE_LABELS[p.edgeTape || 'none'] || 'Sem Fita';
+        doc.text(`${idx + 1}`, 16, y + 4.2);
+        doc.text(p.name, 25, y + 4.2);
+        doc.text(`${p.height / 10} cm`, 68, y + 4.2);
+        doc.text(`${p.width / 10} cm`, 96, y + 4.2);
+        doc.text(edgeLabel, 124, y + 4.2);
+        doc.text(p.ab !== undefined ? `${p.ab / 10} cm` : '-', 158, y + 4.2);
+        doc.text(`${p.quantity}`, 174, y + 4.2);
+        doc.text(`${p.quantity * furnitureQty}`, 188, y + 4.2);
         y += 6;
       });
     }
@@ -1475,6 +1489,7 @@ export default function App() {
         width: widthVal,
         quantity: quantityVal,
         ab: abVal,
+        edgeTape: newPieceEdgeTape,
       } : p));
       setEditingPieceId(null);
     } else {
@@ -1485,9 +1500,11 @@ export default function App() {
         width: widthVal, 
         quantity: quantityVal,
         ab: abVal,
+        edgeTape: newPieceEdgeTape,
       }]);
     }
     setNewPiece({ name: '', height: '', width: '', quantity: '1', ab: '' });
+    setNewPieceEdgeTape('none');
   };
 
   // Add Cost Item
@@ -1719,15 +1736,25 @@ export default function App() {
               </button>
             </div>
             
-            <div className="flex gap-2 mb-4 items-center flex-wrap sm:flex-nowrap">
-              <input list="piece-suggestions" placeholder="Nome da peça" value={newPiece.name} onChange={e => setNewPiece({...newPiece, name: e.target.value})} className="bg-slate-950 border border-slate-800 p-2.5 rounded text-slate-200 text-xs flex-1 min-w-[130px]"/>
+            <div className="flex gap-1.5 mb-4 items-center flex-wrap sm:flex-nowrap">
+              <input list="piece-suggestions" placeholder="Nome da peça" value={newPiece.name} onChange={e => setNewPiece({...newPiece, name: e.target.value})} className="bg-slate-950 border border-slate-800 p-2.5 rounded text-slate-200 text-xs flex-1 min-w-[120px]"/>
               <datalist id="piece-suggestions">
                 {Array.isArray(suggestions) && suggestions.map(s => <option key={s} value={s} />)}
               </datalist>
               <input placeholder="Alt(cm)" value={newPiece.height} onChange={e => setNewPiece({...newPiece, height: e.target.value})} className="bg-slate-950 border border-slate-800 p-2.5 rounded text-slate-200 text-xs text-center w-14"/>
               <input placeholder="Larg(cm)" value={newPiece.width} onChange={e => setNewPiece({...newPiece, width: e.target.value})} className="bg-slate-950 border border-slate-800 p-2.5 rounded text-slate-200 text-xs text-center w-14"/>
-              <input placeholder="AB(cm)" value={newPiece.ab} onChange={e => setNewPiece({...newPiece, ab: e.target.value})} className="bg-slate-950 border border-slate-800 p-2.5 rounded text-slate-200 text-xs text-center w-14" title="Altura a partir da Base em cm (opcional)"/>
-              <input placeholder="Qtd" value={newPiece.quantity} onChange={e => setNewPiece({...newPiece, quantity: e.target.value})} className="bg-slate-950 border border-slate-800 p-2.5 rounded text-slate-200 text-xs text-center w-12"/>
+              <input placeholder="AB(cm)" value={newPiece.ab} onChange={e => setNewPiece({...newPiece, ab: e.target.value})} className="bg-slate-950 border border-slate-800 p-2.5 rounded text-slate-200 text-xs text-center w-12" title="Altura a partir da Base em cm (opcional)"/>
+              <input placeholder="Qtd" value={newPiece.quantity} onChange={e => setNewPiece({...newPiece, quantity: e.target.value})} className="bg-slate-950 border border-slate-800 p-2.5 rounded text-slate-200 text-xs text-center w-11"/>
+              <select
+                value={newPieceEdgeTape}
+                onChange={e => setNewPieceEdgeTape(e.target.value as EdgeTapeOption)}
+                className="bg-slate-950 border border-slate-800 p-2 rounded text-amber-400 font-semibold text-xs min-w-[95px] focus:outline-none focus:border-amber-500"
+                title="Fita de Borda"
+              >
+                {Object.entries(EDGE_TAPE_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
               <button onClick={addPiece} className="bg-amber-500 hover:bg-amber-400 text-black px-3 py-2.5 rounded font-bold text-xs flex items-center gap-1 transition-all active:scale-95 cursor-pointer">
                 {editingPieceId ? 'OK' : <><Plus size={16}/><span>Add</span></>}
               </button>
@@ -1737,8 +1764,8 @@ export default function App() {
               {pieces.map(p => (
                 <li key={p.id} className="flex flex-row gap-1.5 items-center bg-slate-950 p-2 rounded border border-slate-800 text-xs">
                   <input value={p.name} onChange={e => setPieces(pieces.map(x => x.id === p.id ? {...x, name: e.target.value} : x))} className="bg-transparent border-none text-slate-200 w-full focus:outline-none focus:bg-slate-900 rounded px-1" />
-                  <input type="number" value={p.height/10} onChange={e => setPieces(pieces.map(x => x.id === p.id ? {...x, height: parseFloat(e.target.value)*10} : x))} className="bg-transparent border-none text-slate-200 w-12 text-center focus:outline-none focus:bg-slate-900 rounded px-0.5" title="Altura (cm)" />
-                  <input type="number" value={p.width/10} onChange={e => setPieces(pieces.map(x => x.id === p.id ? {...x, width: parseFloat(e.target.value)*10} : x))} className="bg-transparent border-none text-slate-200 w-12 text-center focus:outline-none focus:bg-slate-900 rounded px-0.5" title="Largura (cm)" />
+                  <input type="number" value={p.height/10} onChange={e => setPieces(pieces.map(x => x.id === p.id ? {...x, height: parseFloat(e.target.value)*10} : x))} className="bg-transparent border-none text-slate-200 w-11 text-center focus:outline-none focus:bg-slate-900 rounded px-0.5" title="Altura (cm)" />
+                  <input type="number" value={p.width/10} onChange={e => setPieces(pieces.map(x => x.id === p.id ? {...x, width: parseFloat(e.target.value)*10} : x))} className="bg-transparent border-none text-slate-200 w-11 text-center focus:outline-none focus:bg-slate-900 rounded px-0.5" title="Largura (cm)" />
                   <input 
                     type="text" 
                     value={p.ab !== undefined ? (p.ab / 10).toString().replace('.', ',') : ''} 
@@ -1752,10 +1779,20 @@ export default function App() {
                         setPieces(pieces.map(x => x.id === p.id ? {...x, ab: isNaN(parsed) ? undefined : parsed * 10} : x));
                       }
                     }} 
-                    className="bg-transparent border-none text-amber-400 font-semibold w-12 text-center focus:outline-none focus:bg-slate-900 rounded px-0.5" 
+                    className="bg-transparent border-none text-amber-400 font-semibold w-10 text-center focus:outline-none focus:bg-slate-900 rounded px-0.5" 
                     title="Altura a partir da Base (cm)"
                   />
-                  <input type="number" value={p.quantity} onChange={e => setPieces(pieces.map(x => x.id === p.id ? {...x, quantity: parseInt(e.target.value)} : x))} className="bg-transparent border-none text-slate-200 w-9 text-center focus:outline-none focus:bg-slate-900 rounded px-0.5" title="Quantidade" />
+                  <input type="number" value={p.quantity} onChange={e => setPieces(pieces.map(x => x.id === p.id ? {...x, quantity: parseInt(e.target.value)} : x))} className="bg-transparent border-none text-slate-200 w-8 text-center focus:outline-none focus:bg-slate-900 rounded px-0.5" title="Quantidade" />
+                  <select
+                    value={p.edgeTape || 'none'}
+                    onChange={e => setPieces(pieces.map(x => x.id === p.id ? { ...x, edgeTape: e.target.value as EdgeTapeOption } : x))}
+                    className="bg-slate-900 border border-slate-800 text-amber-400 text-[11px] font-semibold rounded px-1 py-1 focus:outline-none focus:border-amber-500"
+                    title="Fita de Borda"
+                  >
+                    {Object.entries(EDGE_TAPE_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
                   <Trash2 size={15} className="cursor-pointer text-slate-500 hover:text-red-500 transition-colors flex-shrink-0" onClick={() => setPieces(pieces.filter(x => x.id !== p.id))}/>
                 </li>
               ))}
@@ -2906,9 +2943,9 @@ export default function App() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               {/* Box 1: Móveis por Dia */}
-              <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 text-center flex flex-col items-center justify-center">
+              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 text-center flex flex-col items-center justify-center">
                 <span className="text-[10px] text-slate-400 uppercase font-semibold block text-center">
                   Móveis Produzidos / Dia:
                 </span>
@@ -2918,7 +2955,7 @@ export default function App() {
               </div>
 
               {/* Box 2: Móveis por Mês */}
-              <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 text-center flex flex-col items-center justify-center">
+              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 text-center flex flex-col items-center justify-center">
                 <span className="text-[10px] text-slate-400 uppercase font-semibold block text-center">
                   Móveis Produzidos / Mês:
                 </span>
@@ -2928,7 +2965,7 @@ export default function App() {
               </div>
 
               {/* Box 3: Chapas por Dia */}
-              <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 text-center flex flex-col items-center justify-center">
+              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 text-center flex flex-col items-center justify-center">
                 <span className="text-[10px] text-slate-400 uppercase font-semibold block text-center">
                   Chapas Usadas / Dia:
                 </span>
@@ -2943,7 +2980,7 @@ export default function App() {
               </div>
 
               {/* Box 4: Chapas por Mês */}
-              <div className="bg-slate-950 p-5 rounded-lg border border-slate-800 text-center flex flex-col items-center justify-center">
+              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 text-center flex flex-col items-center justify-center">
                 <span className="text-[10px] text-slate-400 uppercase font-semibold block text-center">
                   Chapas Usadas / Mês:
                 </span>
@@ -2955,6 +2992,29 @@ export default function App() {
                     (+ {monthlyBackSheets} chapas de fundo)
                   </span>
                 )}
+              </div>
+
+              {/* Box 5: Fita de Borda Consumida */}
+              <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 text-center flex flex-col items-center justify-center">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block text-center">
+                  Fita de Borda Consumida:
+                </span>
+                <span className="font-mono text-2xl font-extrabold text-amber-400 mt-1 block text-center">
+                  {totalEdgeTapeMetersBatch.toFixed(1)} <span className="text-xs font-normal text-slate-400">m</span>
+                </span>
+                <div className="flex items-center justify-center gap-1 mt-1 text-[10px]">
+                  <span className="text-slate-400">R$</span>
+                  <input
+                    type="number"
+                    step="0.10"
+                    value={edgeTapePricePerMeter}
+                    onChange={e => setEdgeTapePricePerMeter(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-11 bg-slate-900 border border-slate-700 text-amber-400 font-bold rounded px-0.5 text-center font-mono focus:outline-none focus:border-amber-500"
+                    title="Preço por metro da fita de borda"
+                  />
+                  <span className="text-slate-400">/m =</span>
+                  <span className="font-bold text-amber-300 font-mono">R$ {formatBRL(totalEdgeTapeCostBatch)}</span>
+                </div>
               </div>
             </div>
           </div>

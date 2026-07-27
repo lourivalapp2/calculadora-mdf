@@ -1,3 +1,15 @@
+export type EdgeTapeOption = 'none' | '1L_maior' | '2L_maiores' | '1L_menor' | '2L_menores' | '3L' | '4L';
+
+export const EDGE_TAPE_LABELS: Record<EdgeTapeOption, string> = {
+  none: 'Sem Fita',
+  '1L_maior': '1 Lado Maior',
+  '2L_maiores': '2 Lados Maiores',
+  '1L_menor': '1 Lado Menor',
+  '2L_menores': '2 Lados Menores',
+  '3L': '3 Lados (U)',
+  '4L': '4 Lados (Total)',
+};
+
 export interface Piece {
   id: string;
   originalId?: string;
@@ -7,6 +19,37 @@ export interface Piece {
   width: number;  // in mm
   quantity: number;
   ab?: number;    // optional height from the base in mm
+  edgeTape?: EdgeTapeOption; // optional edge tape configuration
+}
+
+/**
+ * Calculates edge tape required for a single unit of piece in linear meters.
+ */
+export function calculatePieceEdgeTapeMeters(piece: Piece): number {
+  const opt = piece.edgeTape || 'none';
+  if (opt === 'none') return 0;
+
+  const hMeters = piece.height / 1000;
+  const wMeters = piece.width / 1000;
+  const maxSide = Math.max(hMeters, wMeters);
+  const minSide = Math.min(hMeters, wMeters);
+
+  switch (opt) {
+    case '1L_maior':
+      return maxSide;
+    case '2L_maiores':
+      return maxSide * 2;
+    case '1L_menor':
+      return minSide;
+    case '2L_menores':
+      return minSide * 2;
+    case '3L':
+      return maxSide * 2 + minSide;
+    case '4L':
+      return (maxSide + minSide) * 2;
+    default:
+      return 0;
+  }
 }
 
 export interface PlacedPiece extends Piece {
