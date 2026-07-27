@@ -113,7 +113,6 @@ export default function App() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [newPiece, setNewPiece] = useState({ name: '', height: '', width: '', quantity: '1', ab: '' });
   const [newPieceEdgeTape, setNewPieceEdgeTape] = useState<EdgeTapeOption>('none');
-  const [edgeTapePricePerMeter, setEdgeTapePricePerMeter] = useState<number>(1.50);
   
   // Backing MDF States (Plano de Corte de Fundo - 3mm/6mm)
   const [backPieces, setBackPieces] = useState<Piece[]>([]);
@@ -807,11 +806,8 @@ export default function App() {
   // Edge Tape Calculations
   const totalEdgeTapeMetersUnit = pieces.reduce((sum, p) => sum + calculatePieceEdgeTapeMeters(p) * p.quantity, 0);
   const totalEdgeTapeMetersBatch = totalEdgeTapeMetersUnit * furnitureQty;
-  const totalEdgeTapeCostBatch = totalEdgeTapeMetersBatch * edgeTapePricePerMeter;
-  const totalEdgeTapeCostUnit = furnitureQty > 0 ? totalEdgeTapeCostBatch / furnitureQty : 0;
 
-  const itemizedUnitCost = costs.reduce((sum, cost) => sum + (cost.unitPrice * cost.quantity), 0);
-  const unitCost = itemizedUnitCost + totalEdgeTapeCostUnit;
+  const unitCost = costs.reduce((sum, cost) => sum + (cost.unitPrice * cost.quantity), 0);
   const totalCost = unitCost * furnitureQty;
 
   // Backing Packing Calculation
@@ -3002,19 +2998,9 @@ export default function App() {
                 <span className="font-mono text-2xl font-extrabold text-amber-400 mt-1 block text-center">
                   {totalEdgeTapeMetersBatch.toFixed(1)} <span className="text-xs font-normal text-slate-400">m</span>
                 </span>
-                <div className="flex items-center justify-center gap-1 mt-1 text-[10px]">
-                  <span className="text-slate-400">R$</span>
-                  <input
-                    type="number"
-                    step="0.10"
-                    value={edgeTapePricePerMeter}
-                    onChange={e => setEdgeTapePricePerMeter(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className="w-11 bg-slate-900 border border-slate-700 text-amber-400 font-bold rounded px-0.5 text-center font-mono focus:outline-none focus:border-amber-500"
-                    title="Preço por metro da fita de borda"
-                  />
-                  <span className="text-slate-400">/m =</span>
-                  <span className="font-bold text-amber-300 font-mono">R$ {formatBRL(totalEdgeTapeCostBatch)}</span>
-                </div>
+                <span className="text-[10px] text-slate-500 block mt-1 font-mono text-center">
+                  ({totalEdgeTapeMetersUnit.toFixed(1)} m / móvel)
+                </span>
               </div>
             </div>
           </div>
