@@ -1,0 +1,6 @@
+{
+  "name": "Calculadora de Corte MDF",
+  "description": "Simulador prático para otimização de cortes de peças em MDF e análise de custos para marcenaria CNC.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
