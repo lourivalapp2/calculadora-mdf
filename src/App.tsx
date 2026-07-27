@@ -98,7 +98,7 @@ function CurrencyInput({ value, onChange }: { value: number; onChange: (val: num
 const defaultSalesScenarios: SalesScenario[] = [
   { id: 'c1', name: 'Cenário 1 (Varejo / Venda Direta)', unitPrice: 0 },
   { id: 'c2', name: 'Cenário 2 (Mercado Livre)', unitPrice: 0 },
-  { id: 'c3', name: 'Cenário 3 (Parceiro / Arquiteto)', unitPrice: 0 },
+  { id: 'c3', name: 'Cenário 3 (Venda Local)', unitPrice: 0 },
 ];
 
 const defaultFixedExpenses: FixedExpense[] = [
@@ -116,7 +116,7 @@ export default function App() {
   // Backing MDF States (Plano de Corte de Fundo - 3mm/6mm)
   const [backPieces, setBackPieces] = useState<Piece[]>([]);
   const [backSheetWidth, setBackSheetWidth] = useState<number>(2750);
-  const [backSheetHeight, setBackSheetHeight] = useState<number>(1830);
+  const [backSheetHeight, setBackSheetHeight] = useState<number>(1850);
   const [newBackPiece, setNewBackPiece] = useState({ name: '', height: '', width: '', quantity: '1' });
   const backCanvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
 
@@ -125,13 +125,13 @@ export default function App() {
 
   // Monthly DRE & Business Viability States
   const [workDaysPerMonth, setWorkDaysPerMonth] = useState<number>(25);
-  const [taxRate, setTaxRate] = useState<number>(4.0);
-  const [mlFeeRate, setMlFeeRate] = useState<number>(0);
+  const [taxRate, setTaxRate] = useState<number>(8.0);
+  const [mlFeeRate, setMlFeeRate] = useState<number>(30);
   const [targetNetMargin, setTargetNetMargin] = useState<number>(30);
   const [includeFixedInMarkup, setIncludeFixedInMarkup] = useState<boolean>(true);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>('c1');
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(defaultFixedExpenses);
-  const [hideFixedExpensesInDre, setHideFixedExpensesInDre] = useState<boolean>(false);
+  const [hideFixedExpensesInDre, setHideFixedExpensesInDre] = useState<boolean>(true);
   const [newFixedExpense, setNewFixedExpense] = useState({ name: '', value: '' });
 
   // Cost Input State: Name, Unit Price, Quantity
@@ -145,7 +145,7 @@ export default function App() {
   const [calcFurnitureQty, setCalcFurnitureQty] = useState<number>(1);
 
   const [sheetWidth, setSheetWidth] = useState(2750);
-  const [sheetHeight, setSheetHeight] = useState(1750);
+  const [sheetHeight, setSheetHeight] = useState(1850);
   const [furnitureImages, setFurnitureImages] = useState<string[]>([]);
   const [competitorItems, setCompetitorItems] = useState<CompetitorItem[]>([]);
   const [newCompetitorPrice, setNewCompetitorPrice] = useState<string>('');
@@ -448,7 +448,7 @@ export default function App() {
     setPieces(project.pieces ? [...project.pieces] : []);
     setCosts(project.costs ? [...project.costs] : []);
     setSheetWidth(project.sheetWidth || 2750);
-    setSheetHeight(project.sheetHeight || 1750);
+    setSheetHeight(project.sheetHeight || 1850);
     setFurnitureQty(project.furnitureQty || 1);
     setFurnitureImages(project.furnitureImages ? [...project.furnitureImages] : []);
     if (project.competitorItems && Array.isArray(project.competitorItems)) {
@@ -460,11 +460,11 @@ export default function App() {
     }
     setBackPieces(project.backPieces ? [...project.backPieces] : []);
     setBackSheetWidth(project.backSheetWidth || 2750);
-    setBackSheetHeight(project.backSheetHeight || 1830);
+    setBackSheetHeight(project.backSheetHeight || 1850);
     setSalesScenarios(project.salesScenarios ? [...project.salesScenarios] : defaultSalesScenarios);
     setWorkDaysPerMonth(project.workDaysPerMonth || 25);
-    setTaxRate(project.taxRate !== undefined ? project.taxRate : 4.0);
-    setMlFeeRate(project.mlFeeRate !== undefined ? project.mlFeeRate : 0);
+    setTaxRate(project.taxRate !== undefined ? project.taxRate : 8.0);
+    setMlFeeRate(project.mlFeeRate !== undefined ? project.mlFeeRate : 30);
     setTargetNetMargin(project.targetNetMargin !== undefined ? project.targetNetMargin : 30);
     setIncludeFixedInMarkup(project.includeFixedInMarkup !== undefined ? project.includeFixedInMarkup : true);
     setSelectedScenarioId(project.selectedScenarioId || 'c1');
@@ -549,7 +549,7 @@ export default function App() {
       name: 'Novo Projeto de Marcenaria',
       updatedAt: new Date().toISOString(),
       sheetWidth: 2750,
-      sheetHeight: 1750,
+      sheetHeight: 1850,
       furnitureQty: 1,
       pieces: [],
       costs: [],
@@ -557,7 +557,8 @@ export default function App() {
       competitorItems: [],
       salesScenarios: defaultSalesScenarios,
       workDaysPerMonth: 25,
-      taxRate: 4.0,
+      taxRate: 8.0,
+      mlFeeRate: 30,
       selectedScenarioId: 'c1',
       fixedExpenses: defaultFixedExpenses,
     };
@@ -571,10 +572,14 @@ export default function App() {
     setSelectedImageIndex(0);
     setFurnitureQty(1);
     setSheetWidth(2750);
-    setSheetHeight(1750);
+    setSheetHeight(1850);
+    setBackSheetWidth(2750);
+    setBackSheetHeight(1850);
     setSalesScenarios(defaultSalesScenarios);
     setWorkDaysPerMonth(25);
-    setTaxRate(4.0);
+    setTaxRate(8.0);
+    setMlFeeRate(30);
+    setHideFixedExpensesInDre(true);
     setSelectedScenarioId('c1');
     setFixedExpenses(defaultFixedExpenses);
 
