@@ -866,7 +866,7 @@ export default function App() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('ROUTERNEST', 14, 14);
+    doc.text('ROUTERLUCRATIVA', 14, 14);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
@@ -1518,7 +1518,7 @@ export default function App() {
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           {/* Logo & Project Name Input */}
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-3xl font-bold text-slate-100 tracking-tight">ROUTER<span className="text-amber-500">NEST</span></h1>
+            <h1 className="text-3xl font-bold text-slate-100 tracking-tight">ROUTER<span className="text-amber-500">LUCRATIVA</span></h1>
             
             {/* Editable Project Name */}
             <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded px-2.5 py-1">
