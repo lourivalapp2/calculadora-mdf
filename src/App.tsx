@@ -22,11 +22,14 @@ import {
   X,
   Link,
   ExternalLink,
+  Star,
+  BarChart3,
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { FurniturePreview } from './components/FurniturePreview';
 import { AiPieceExtractorModal } from './components/AiPieceExtractorModal';
 import { ProjectsModal, SavedProject, SalesScenario, FixedExpense, CompetitorItem } from './components/ProjectsModal';
+import { ExecutiveSummaryModal } from './components/ExecutiveSummaryModal';
 import { fetchProjectsFromCloud, saveProjectToCloud, deleteProjectFromCloud, isSupabaseConfigured } from './lib/supabase';
 
 export interface CostItem {
@@ -130,7 +133,7 @@ export default function App() {
   const [mlFeeRate, setMlFeeRate] = useState<number>(30);
   const [targetNetMargin, setTargetNetMargin] = useState<number>(30);
   const [includeFixedInMarkup, setIncludeFixedInMarkup] = useState<boolean>(true);
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('c1');
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('c2');
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(defaultFixedExpenses);
   const [hideFixedExpensesInDre, setHideFixedExpensesInDre] = useState<boolean>(true);
   const [simulateOneUnitPerDay, setSimulateOneUnitPerDay] = useState<boolean>(false);
@@ -189,6 +192,7 @@ export default function App() {
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(isSupabaseConfigured());
   const [isProjectsModalOpen, setIsProjectsModalOpen] = useState<boolean>(false);
+  const [isExecutiveSummaryOpen, setIsExecutiveSummaryOpen] = useState<boolean>(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
 
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
@@ -396,7 +400,10 @@ export default function App() {
   // Explicit Save Project to Browser / Supabase Cloud
   const handleSaveProjectToBrowser = async () => {
     const projId = currentProjectId || `proj-${Date.now()}`;
+    const existingProj = savedProjects.find(p => p.id === projId);
+
     const projectToSave: SavedProject = {
+      ...(existingProj || {}),
       id: projId,
       name: projectName || 'Projeto sem nome',
       updatedAt: new Date().toISOString(),
@@ -418,6 +425,7 @@ export default function App() {
       includeFixedInMarkup,
       selectedScenarioId,
       fixedExpenses: [...fixedExpenses],
+      isFavorite: Boolean(existingProj?.isFavorite),
     };
 
     setCurrentProjectId(projId);
@@ -469,7 +477,7 @@ export default function App() {
     setMlFeeRate(project.mlFeeRate !== undefined ? project.mlFeeRate : 30);
     setTargetNetMargin(project.targetNetMargin !== undefined ? project.targetNetMargin : 30);
     setIncludeFixedInMarkup(project.includeFixedInMarkup !== undefined ? project.includeFixedInMarkup : true);
-    setSelectedScenarioId(project.selectedScenarioId || 'c1');
+    setSelectedScenarioId(project.selectedScenarioId || 'c2');
     setFixedExpenses(project.fixedExpenses ? [...project.fixedExpenses] : defaultFixedExpenses);
     setSelectedImageIndex(0);
 
@@ -527,6 +535,81 @@ export default function App() {
     setTimeout(() => setSaveToast(null), 3000);
   };
 
+  // Toggle Favorite Status for Current Active Project
+  const handleToggleCurrentFavorite = async () => {
+    const projId = currentProjectId || `proj-${Date.now()}`;
+    const existingProj = savedProjects.find(p => p.id === projId);
+    const newFavStatus = existingProj ? !existingProj.isFavorite : true;
+
+    const projectToSave: SavedProject = {
+      ...(existingProj || {}),
+      id: projId,
+      name: projectName || 'Projeto de Marcenaria',
+      updatedAt: new Date().toISOString(),
+      sheetWidth,
+      sheetHeight,
+      furnitureQty,
+      pieces: [...pieces],
+      costs: [...costs],
+      furnitureImages: [...furnitureImages],
+      competitorItems: [...competitorItems],
+      backPieces: [...backPieces],
+      backSheetWidth,
+      backSheetHeight,
+      salesScenarios: [...salesScenarios],
+      workDaysPerMonth,
+      taxRate,
+      mlFeeRate,
+      targetNetMargin,
+      includeFixedInMarkup,
+      selectedScenarioId,
+      fixedExpenses: [...fixedExpenses],
+      isFavorite: newFavStatus,
+    };
+
+    setCurrentProjectId(projId);
+    localStorage.setItem('mdf-current-project-id', projId);
+    await saveProjectToCloud(projectToSave);
+
+    setSavedProjects(prevList => {
+      const exists = prevList.some(p => p.id === projId);
+      let updatedList: SavedProject[];
+      if (exists) {
+        updatedList = prevList.map(p => (p.id === projId ? projectToSave : p));
+      } else {
+        updatedList = [projectToSave, ...prevList];
+      }
+      safeSaveProjectsList(updatedList);
+      return updatedList;
+    });
+
+    setSaveToast(
+      newFavStatus
+        ? `Projeto "${projectToSave.name}" adicionado aos favoritos! ⭐`
+        : `Projeto "${projectToSave.name}" removido dos favoritos.`
+    );
+    setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  // Toggle Favorite Status for Any Project by ID
+  const handleToggleFavoriteProject = async (projectId: string) => {
+    const target = savedProjects.find(p => p.id === projectId);
+    if (!target) return;
+
+    const updated: SavedProject = {
+      ...target,
+      updatedAt: new Date().toISOString(),
+      isFavorite: !target.isFavorite,
+    };
+
+    await saveProjectToCloud(updated);
+    setSavedProjects(prevList => {
+      const newList = prevList.map(p => (p.id === projectId ? updated : p));
+      safeSaveProjectsList(newList);
+      return newList;
+    });
+  };
+
   // Add Fixed Expense Item
   const addFixedExpense = () => {
     if (!newFixedExpense.name || !newFixedExpense.value) return;
@@ -561,7 +644,7 @@ export default function App() {
       workDaysPerMonth: 25,
       taxRate: 8.0,
       mlFeeRate: 30,
-      selectedScenarioId: 'c1',
+      selectedScenarioId: 'c2',
       fixedExpenses: defaultFixedExpenses,
     };
 
@@ -1535,7 +1618,7 @@ export default function App() {
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-3xl font-bold text-slate-100 tracking-tight">ROUTER<span className="text-amber-500">LUCRATIVA</span></h1>
             
-            {/* Editable Project Name */}
+            {/* Editable Project Name & Favorite Star */}
             <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded px-2.5 py-1">
               <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Projeto:</span>
               <input
@@ -1543,14 +1626,46 @@ export default function App() {
                 value={projectName}
                 onChange={e => setProjectName(e.target.value)}
                 placeholder="Nome do Projeto"
-                className="bg-transparent text-amber-400 font-bold text-xs focus:outline-none w-48 md:w-56"
+                className="bg-transparent text-amber-400 font-bold text-xs focus:outline-none w-44 md:w-52"
               />
+              <button
+                onClick={handleToggleCurrentFavorite}
+                className="p-1 rounded hover:bg-slate-900 transition-colors"
+                title={
+                  (savedProjects.find(p => p.id === currentProjectId)?.isFavorite)
+                    ? 'Remover este projeto dos favoritos'
+                    : 'Marcar este projeto como favorito'
+                }
+              >
+                <Star
+                  className={`w-4 h-4 transition-all ${
+                    savedProjects.find(p => p.id === currentProjectId)?.isFavorite
+                      ? 'fill-amber-400 text-amber-400 scale-110'
+                      : 'text-slate-600 hover:text-amber-400'
+                  }`}
+                />
+              </button>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-3 items-center">
             {/* Project Management Actions */}
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Executive Summary & DRE Button */}
+              <button
+                onClick={() => setIsExecutiveSummaryOpen(true)}
+                className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 px-3.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all active:scale-95 shadow-md shadow-amber-500/20 cursor-pointer"
+                title="Abrir o Resumo Gerencial, Comparativo de Móveis e DRE Consolidada"
+              >
+                <BarChart3 size={15} />
+                <span>Resumo Gerencial</span>
+                {savedProjects.filter(p => p.isFavorite).length > 0 && (
+                  <span className="bg-slate-950 text-amber-400 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold">
+                    {savedProjects.filter(p => p.isFavorite).length} ⭐
+                  </span>
+                )}
+              </button>
+
               {/* Browser LocalStorage Multi-Project Manager Button */}
               <button
                 onClick={() => setIsProjectsModalOpen(true)}
@@ -1623,6 +1738,16 @@ export default function App() {
         onDeleteProject={handleDeleteProjectFromBrowser}
         onDuplicateProject={handleDuplicateProject}
         onNewBlankProject={handleNewBlankProject}
+        onToggleFavoriteProject={handleToggleFavoriteProject}
+      />
+
+      {/* Executive Management Summary & DRE Modal */}
+      <ExecutiveSummaryModal
+        isOpen={isExecutiveSummaryOpen}
+        onClose={() => setIsExecutiveSummaryOpen(false)}
+        savedProjects={savedProjects}
+        onLoadProject={handleLoadProjectFromBrowser}
+        onToggleFavoriteProject={handleToggleFavoriteProject}
       />
 
       {/* Main Furniture Project Section */}
@@ -1943,7 +2068,7 @@ export default function App() {
                 <h2 className="text-lg font-semibold text-slate-100 uppercase tracking-widest text-xs">Simulação CNC - Plano de Corte</h2>
                 <p className="text-lg text-amber-500 font-medium mt-0.5">Lote: <span className="font-bold text-slate-100">{furnitureQty} móvel(is)</span></p>
               </div>
-              <div className='flex items-center gap-2'>
+              <div className='flex items-center gap-2 flex-wrap'>
                 <button
                   onClick={handleViewPDF}
                   className='bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/50 px-3 py-1.5 rounded flex items-center gap-1.5 text-xs font-bold transition-all active:scale-95 cursor-pointer'
@@ -2521,11 +2646,16 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* Mercado Livre Suggestion */}
-                    <div className="bg-slate-900/80 p-2.5 rounded border border-slate-800 flex justify-between items-center gap-2">
+                    {/* Mercado Livre Suggestion (Highlighted) */}
+                    <div className="bg-gradient-to-r from-amber-950/80 via-yellow-950/50 to-slate-900 border-2 border-amber-500/80 p-2.5 rounded flex justify-between items-center gap-2 shadow-md">
                       <div>
-                        <span className="text-[10px] text-slate-400 font-sans block">Venda Mercado Livre (+Taxa {mlFeeRate}%):</span>
-                        <span className="text-sm font-bold text-amber-400">R$ {formatBRL(suggestedMLPrice)}</span>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="bg-yellow-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded font-sans uppercase">
+                            📦 Mercado Livre
+                          </span>
+                          <span className="text-[10px] text-amber-300 font-sans font-semibold">(+Taxa {mlFeeRate}%):</span>
+                        </div>
+                        <span className="text-sm font-black text-amber-400">R$ {formatBRL(suggestedMLPrice)}</span>
                       </div>
                       <button
                         onClick={() => {
@@ -2535,7 +2665,7 @@ export default function App() {
                             setTimeout(() => setSaveToast(null), 3500);
                           }
                         }}
-                        className="bg-amber-950/80 hover:bg-amber-900 border border-amber-700/60 text-amber-300 text-[10px] px-2 py-1.5 rounded font-sans font-bold transition-all cursor-pointer whitespace-nowrap"
+                        className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 text-[10px] px-2.5 py-1.5 rounded font-sans font-extrabold transition-all cursor-pointer whitespace-nowrap shadow-md active:scale-95"
                       >
                         Aplicar no Cenário 2
                       </button>
@@ -2546,24 +2676,43 @@ export default function App() {
             })()}
 
             <div className="space-y-3">
-              {salesScenarios.map((scenario) => {
+              {salesScenarios.map((scenario, index) => {
+                const isML = scenario.id === 'c2' || index === 1 || scenario.name.toLowerCase().includes('mercado livre');
                 const totalRevenue = scenario.unitPrice * furnitureQty;
                 const unitProfit = scenario.unitPrice - unitCost;
                 const totalProfit = totalRevenue - totalCost;
                 const margin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
                 return (
-                  <div key={scenario.id} className="bg-slate-950 p-4 rounded-lg border border-slate-800 hover:border-slate-700 transition-all space-y-3">
+                  <div
+                    key={scenario.id}
+                    className={`p-4 rounded-xl transition-all space-y-3 ${
+                      isML
+                        ? 'bg-gradient-to-r from-amber-950/70 via-yellow-950/40 to-slate-950 border-2 border-amber-500 shadow-xl shadow-amber-500/10 ring-1 ring-amber-500/30'
+                        : 'bg-slate-950 border border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-900 pb-2">
-                      <input
-                        type="text"
-                        value={scenario.name}
-                        onChange={e => setSalesScenarios(salesScenarios.map(s => s.id === scenario.id ? { ...s, name: e.target.value } : s))}
-                        className="bg-transparent text-slate-100 font-bold text-xs focus:outline-none focus:bg-slate-900 rounded px-1.5 py-0.5 flex-1"
-                      />
+                      <div className="flex items-center gap-2 flex-1">
+                        {isML && (
+                          <span className="bg-yellow-500 text-slate-950 font-black text-[10px] uppercase px-2 py-0.5 rounded-full shadow shrink-0">
+                            📦 Mercado Livre
+                          </span>
+                        )}
+                        <input
+                          type="text"
+                          value={scenario.name}
+                          onChange={e => setSalesScenarios(salesScenarios.map(s => s.id === scenario.id ? { ...s, name: e.target.value } : s))}
+                          className={`font-bold text-xs focus:outline-none rounded px-1.5 py-0.5 flex-1 ${
+                            isML ? 'bg-amber-950/60 text-amber-300 border border-amber-500/40' : 'bg-transparent text-slate-100 focus:bg-slate-900'
+                          }`}
+                        />
+                      </div>
 
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-slate-400 uppercase font-semibold">Venda Unitária (R$):</span>
+                        <span className={`text-[11px] uppercase font-bold ${isML ? 'text-amber-300' : 'text-slate-400'}`}>
+                          Venda Unitária (R$):
+                        </span>
                         <input
                           type="number"
                           step="0.01"
@@ -2573,35 +2722,39 @@ export default function App() {
                             const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                             setSalesScenarios(salesScenarios.map(s => s.id === scenario.id ? { ...s, unitPrice: isNaN(val) ? 0 : val } : s));
                           }}
-                          className="bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-sm h-8 rounded w-28 text-center font-mono focus:outline-none focus:border-emerald-500"
+                          className={`font-bold text-sm h-8 rounded w-28 text-center font-mono focus:outline-none ${
+                            isML
+                              ? 'bg-slate-950 border-2 border-amber-400 text-amber-300 shadow-md focus:border-yellow-300'
+                              : 'bg-slate-900 border border-slate-700 text-emerald-400 focus:border-emerald-500'
+                          }`}
                         />
                       </div>
                     </div>
 
                     {/* Financial Metrics Row */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
-                      <div className="bg-slate-900/60 p-2 rounded border border-slate-850">
+                      <div className={`p-2 rounded border ${isML ? 'bg-slate-950/80 border-amber-500/30' : 'bg-slate-900/60 border-slate-850'}`}>
                         <span className="text-[10px] text-slate-400 block font-semibold">Faturamento Lote:</span>
-                        <span className="font-mono text-slate-100 font-bold text-sm">
+                        <span className={`font-mono font-bold text-sm ${isML ? 'text-amber-300' : 'text-slate-100'}`}>
                           R$ {formatBRL(totalRevenue)}
                         </span>
                       </div>
 
-                      <div className="bg-slate-900/60 p-2 rounded border border-slate-850">
+                      <div className={`p-2 rounded border ${isML ? 'bg-slate-950/80 border-amber-500/30' : 'bg-slate-900/60 border-slate-850'}`}>
                         <span className="text-[10px] text-slate-400 block font-semibold">Lucro / Móvel:</span>
-                        <span className={`font-mono font-bold text-sm ${unitProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <span className={`font-mono font-bold text-sm ${unitProfit >= 0 ? (isML ? 'text-emerald-400' : 'text-emerald-400') : 'text-red-400'}`}>
                           R$ {formatBRL(unitProfit)}
                         </span>
                       </div>
 
-                      <div className="bg-slate-900/60 p-2 rounded border border-slate-850">
+                      <div className={`p-2 rounded border ${isML ? 'bg-slate-950/80 border-amber-500/30' : 'bg-slate-900/60 border-slate-850'}`}>
                         <span className="text-[10px] text-slate-400 block font-semibold">Lucro Total Lote:</span>
                         <span className={`font-mono font-bold text-sm ${totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                           R$ {formatBRL(totalProfit)}
                         </span>
                       </div>
 
-                      <div className="bg-slate-900/60 p-2 rounded border border-slate-850">
+                      <div className={`p-2 rounded border ${isML ? 'bg-slate-950/80 border-amber-500/30' : 'bg-slate-900/60 border-slate-850'}`}>
                         <span className="text-[10px] text-slate-400 block font-semibold">Margem de Lucro:</span>
                         <span className={`font-mono font-bold text-sm ${margin >= 40 ? 'text-emerald-400' : margin > 0 ? 'text-amber-400' : 'text-red-400'}`}>
                           {margin.toFixed(2)}%

@@ -4,8 +4,9 @@ import { SavedProject } from '../components/ProjectsModal';
 const LOCAL_STORAGE_KEY = 'mdf_saved_projects_v1';
 
 // Obtain environment variables for Supabase connection (with fallback credentials)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://wqchmksdvuvzbyzgpouy.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_TDeVQJ5ohTUlESN9Inf-Rw_uNYSG8UR';
+const env = (import.meta as any).env || {};
+const supabaseUrl = env.VITE_SUPABASE_URL || 'https://wqchmksdvuvzbyzgpouy.supabase.co';
+const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_TDeVQJ5ohTUlESN9Inf-Rw_uNYSG8UR';
 
 // Singleton client instance
 export const supabase: SupabaseClient | null =
@@ -51,7 +52,7 @@ export const fetchProjectsFromCloud = async (): Promise<{
   isCloud: boolean;
   error?: string;
 }> => {
-  const localProjects = getLocalProjects();
+  const localProjects = getLocalProjects().filter(p => p.id !== '__global_analysis_scenarios__');
 
   if (!isSupabaseConfigured() || !supabase) {
     return { projects: localProjects, isCloud: false };
@@ -69,7 +70,8 @@ export const fetchProjectsFromCloud = async (): Promise<{
     }
 
     if (data) {
-      const cloudProjects: SavedProject[] = data.map(row => {
+      const filteredRows = data.filter(row => row.id !== '__global_analysis_scenarios__');
+      const cloudProjects: SavedProject[] = filteredRows.map(row => {
         // If data column is a JSON object or stringified JSON
         const parsedData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
         return {
@@ -89,6 +91,74 @@ export const fetchProjectsFromCloud = async (): Promise<{
   } catch (err: any) {
     console.error('Erro na requisição Supabase:', err);
     return { projects: localProjects, isCloud: false, error: err.message || 'Erro de conexão' };
+  }
+};
+
+/**
+ * Fetches saved analysis scenarios from Supabase Cloud with fallback to localStorage
+ */
+export const fetchScenariosFromCloud = async (): Promise<any[]> => {
+  const LOCAL_SCENARIOS_KEY = 'mdf-analysis-scenarios-v1';
+  let localScenarios: any[] = [];
+  try {
+    const raw = localStorage.getItem(LOCAL_SCENARIOS_KEY);
+    if (raw) localScenarios = JSON.parse(raw);
+  } catch (e) {
+    console.error('Erro ao ler cenários locais:', e);
+  }
+
+  if (!isSupabaseConfigured() || !supabase) {
+    return localScenarios;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', '__global_analysis_scenarios__')
+      .single();
+
+    if (error || !data) {
+      return localScenarios;
+    }
+
+    const parsedData = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
+    const cloudScenarios = parsedData?.scenarios || localScenarios;
+    try {
+      localStorage.setItem(LOCAL_SCENARIOS_KEY, JSON.stringify(cloudScenarios));
+    } catch (e) {}
+    return cloudScenarios;
+  } catch (e) {
+    return localScenarios;
+  }
+};
+
+/**
+ * Saves analysis scenarios array to Supabase Cloud and syncs to localStorage
+ */
+export const saveScenariosToCloud = async (scenarios: any[]): Promise<boolean> => {
+  const LOCAL_SCENARIOS_KEY = 'mdf-analysis-scenarios-v1';
+  try {
+    localStorage.setItem(LOCAL_SCENARIOS_KEY, JSON.stringify(scenarios));
+  } catch (e) {}
+
+  if (!isSupabaseConfigured() || !supabase) {
+    return false;
+  }
+
+  try {
+    const { error } = await supabase.from('projects').upsert(
+      {
+        id: '__global_analysis_scenarios__',
+        name: 'Cenários de Análise Salvos',
+        updated_at: new Date().toISOString(),
+        data: { scenarios },
+      },
+      { onConflict: 'id' }
+    );
+    return !error;
+  } catch (e) {
+    return false;
   }
 };
 
