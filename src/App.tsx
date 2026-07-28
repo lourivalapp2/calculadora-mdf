@@ -1723,7 +1723,7 @@ export default function App() {
           {/* 1. Pieces List Section */}
           <section className="bg-slate-900 border border-slate-800 p-6 rounded-lg shadow-lg">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-amber-400 uppercase tracking-widest text-xs">Lista de Peças ({pieces.length})</h2>
+              <h2 className="text-base font-semibold text-amber-400 uppercase tracking-widest">Lista de Peças ({pieces.length})</h2>
               <button onClick={() => setPieces([])} className="text-slate-500 hover:text-red-400 text-xs flex items-center gap-1 cursor-pointer">
                 <Trash2 size={13} /> Limpar Peças
               </button>
@@ -1777,7 +1777,7 @@ export default function App() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                 <Layers className="w-5 h-5 text-amber-500" />
-                <span className="text-amber-400 font-bold uppercase tracking-wider text-xs">
+                <span className="text-base text-amber-400 font-bold uppercase tracking-wider">
                   Qtd. de Móveis a Produzir no Lote:
                 </span>
               </div>
@@ -1941,7 +1941,7 @@ export default function App() {
             <div className='flex justify-between items-center mb-4 pb-3 border-b border-slate-800'>
               <div>
                 <h2 className="text-lg font-semibold text-slate-100 uppercase tracking-widest text-xs">Simulação CNC - Plano de Corte</h2>
-                <p className="text-xs text-amber-500 font-medium mt-0.5">Lote: <span className="font-bold text-slate-100">{furnitureQty} móvel(is)</span></p>
+                <p className="text-lg text-amber-500 font-medium mt-0.5">Lote: <span className="font-bold text-slate-100">{furnitureQty} móvel(is)</span></p>
               </div>
               <div className='flex items-center gap-2'>
                 <button
@@ -2000,7 +2000,7 @@ export default function App() {
               <h2 className="text-lg font-semibold text-slate-100 uppercase tracking-widest text-xs">
                 Simulação CNC - Plano de Corte de FUNDO (MDF 3mm / 6mm)
               </h2>
-              <p className="text-xs text-emerald-400 font-medium mt-0.5">
+              <p className="text-lg text-emerald-400 font-medium mt-0.5">
                 Lote: <span className="font-bold text-slate-100">{furnitureQty} móvel(is)</span>
               </p>
             </div>
@@ -2201,10 +2201,10 @@ export default function App() {
               <DollarSign className="w-6 h-6 text-amber-500" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-100 uppercase tracking-widest text-xs">
+              <h2 className="text-lg font-bold text-slate-100 uppercase tracking-widest">
                 Fechamento Financeiro: Custos, Cenários de Venda & Lucratividade
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-sm text-slate-400 mt-0.5">
                 Defina os custos de insumos e simule cenários de preço de venda por unidade e por lote ({furnitureQty} {furnitureQty === 1 ? 'móvel' : 'móveis'}).
               </p>
             </div>
@@ -2224,9 +2224,9 @@ export default function App() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Left Column: Itemized Production Costs Table */}
           <div className="space-y-4">
-            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
+            <h3 className="text-lg font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
               <span>1. Custos de Produção por Móvel (Insumos)</span>
-              <span className="text-[10px] text-slate-400 font-normal">Cadastre os insumos para 1 móvel</span>
+              <span className="text-xs text-slate-400 font-normal">Cadastre os insumos para 1 móvel</span>
             </h3>
 
             {/* Add Cost Form */}
@@ -2440,9 +2440,9 @@ export default function App() {
 
           {/* Right Column: Sales Scenarios & Profitability Analysis */}
           <div className="space-y-4">
-            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-between">
+            <h3 className="text-lg font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-between">
               <span>2. Simulação de Cenários de Venda & Lucro</span>
-              <span className="text-[10px] text-slate-400 font-normal">Digite o valor de venda por unidade</span>
+              <span className="text-xs text-slate-400 font-normal">Digite o valor de venda por unidade</span>
             </h3>
 
             {/* CALCULADORA DE PREÇO REVERSO (MARGEM ALVO / MARKUP) */}
