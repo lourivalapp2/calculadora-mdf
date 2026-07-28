@@ -7,6 +7,7 @@ import {
 
 import { PurchaseProductData } from '../lib/mlScraper';
 import { fetchPurchaseLibraryFromCloud, savePurchaseLibraryToCloud } from '../lib/supabase';
+import { ConfirmModal } from './ConfirmModal';
 
 interface PurchaseLibraryModalProps {
   isOpen: boolean;
@@ -31,7 +32,9 @@ export const PurchaseLibraryModal: React.FC<PurchaseLibraryModalProps> = ({
   onImportToProject,
 }) => {
   const [libraryItems, setLibraryItems] = useState<PurchaseProductData[]>([]);
+  const [itemToDelete, setItemToDelete] = useState<PurchaseProductData | null>(null);
   const [customCategories, setCustomCategories] = useState<string[]>(() => {
+
     try {
       const saved = localStorage.getItem('mdf-purchase-custom-categories');
       return saved ? JSON.parse(saved) : [];
@@ -320,17 +323,21 @@ export const PurchaseLibraryModal: React.FC<PurchaseLibraryModalProps> = ({
     await savePurchaseLibraryToCloud(updated);
   };
 
-  const handleDeleteItem = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este item da lista de compras?')) return;
+  const confirmDeleteItem = async () => {
+    if (!itemToDelete) return;
+    const id = itemToDelete.id;
+    const title = itemToDelete.title;
     const updated = safeItems.filter(item => item.id !== id);
     setLibraryItems(updated);
     await savePurchaseLibraryToCloud(updated);
-    showToast('Item removido da lista de compras.');
+    showToast(`Item "${title}" removido da lista de compras.`);
 
     if (editingId === id) {
       resetForm();
     }
+    setItemToDelete(null);
   };
+
 
   // Filter items safely with null checks
   const filteredItems = safeItems.filter(item => {
@@ -810,19 +817,7 @@ export const PurchaseLibraryModal: React.FC<PurchaseLibraryModalProps> = ({
 
                       {/* Col 5: Action Buttons */}
                       <div className="w-full lg:col-span-3 flex items-center justify-end gap-1.5 pt-2 lg:pt-0 border-t lg:border-0 border-slate-900">
-                        {onImportToProject && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onImportToProject(item);
-                              showToast(`"${item.title}" lançado nos insumos do projeto!`);
-                            }}
-                            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-2 py-1 rounded text-[11px] transition-all cursor-pointer whitespace-nowrap"
-                            title="Lançar preço como insumo no projeto ativo"
-                          >
-                            Usar no Projeto
-                          </button>
-                        )}
+
 
                         <button
                           type="button"
@@ -836,7 +831,7 @@ export const PurchaseLibraryModal: React.FC<PurchaseLibraryModalProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => handleDeleteItem(item.id)}
+                          onClick={() => setItemToDelete(item)}
                           className="bg-slate-900 hover:bg-red-950/40 border border-slate-800 hover:border-red-800/50 text-slate-400 hover:text-red-400 p-1.5 rounded transition-colors cursor-pointer"
                           title="Excluir item da lista de compras"
                         >
@@ -850,7 +845,19 @@ export const PurchaseLibraryModal: React.FC<PurchaseLibraryModalProps> = ({
             )}
           </div>
         </div>
+
+        {/* Confirmation Modal for Purchase Item Deletion */}
+        <ConfirmModal
+          isOpen={Boolean(itemToDelete)}
+          title="Excluir Item de Compra"
+          message={`Tem certeza que deseja excluir "${itemToDelete?.title}" da lista de compras? Esta ação não pode ser desfeita.`}
+          confirmText="Sim, Excluir"
+          cancelText="Cancelar"
+          onConfirm={confirmDeleteItem}
+          onCancel={() => setItemToDelete(null)}
+        />
       </div>
     </div>
   );
 };
+

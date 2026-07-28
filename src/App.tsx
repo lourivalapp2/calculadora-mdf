@@ -36,6 +36,8 @@ import { MercadoLivreLibraryModal } from './components/MercadoLivreLibraryModal'
 import { PurchaseLibraryModal } from './components/PurchaseLibraryModal';
 import { PurchaseProductData } from './lib/mlScraper';
 import { fetchProjectsFromCloud, saveProjectToCloud, deleteProjectFromCloud, isSupabaseConfigured } from './lib/supabase';
+import { ConfirmModal } from './components/ConfirmModal';
+
 
 
 export interface CostItem {
@@ -202,6 +204,32 @@ export default function App() {
   const [isMlLibraryOpen, setIsMlLibraryOpen] = useState<boolean>(false);
   const [isPurchaseLibraryOpen, setIsPurchaseLibraryOpen] = useState<boolean>(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  // Custom Confirm Modal State
+  const [confirmDeleteState, setConfirmDeleteState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const requestDeleteConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmDeleteState({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setConfirmDeleteState(prev => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
 
   const handleImportMlProductToProject = (product: any) => {
     if (competitorItems.length >= 5) {
@@ -760,12 +788,19 @@ export default function App() {
   };
 
   const removeImage = (indexToRemove: number) => {
-    const updated = furnitureImages.filter((_, idx) => idx !== indexToRemove);
-    setFurnitureImages(updated);
-    if (selectedImageIndex >= updated.length) {
-      setSelectedImageIndex(Math.max(0, updated.length - 1));
-    }
+    requestDeleteConfirm(
+      'Excluir Foto de Referência',
+      'Tem certeza que deseja excluir esta foto de referência do projeto?',
+      () => {
+        const updated = furnitureImages.filter((_, idx) => idx !== indexToRemove);
+        setFurnitureImages(updated);
+        if (selectedImageIndex >= updated.length) {
+          setSelectedImageIndex(Math.max(0, updated.length - 1));
+        }
+      }
+    );
   };
+
   const handleImportPiecesFromAi = (newPieces: Piece[], replaceExisting: boolean) => {
     if (replaceExisting) {
       setPieces(newPieces);
@@ -3400,6 +3435,18 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Global Custom Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmDeleteState.isOpen}
+        title={confirmDeleteState.title}
+        message={confirmDeleteState.message}
+        confirmText="Sim, Excluir"
+        cancelText="Cancelar"
+        onConfirm={confirmDeleteState.onConfirm}
+        onCancel={() => setConfirmDeleteState(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
+

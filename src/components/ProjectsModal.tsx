@@ -60,6 +60,8 @@ interface ProjectsModalProps {
   onToggleFavoriteProject?: (projectId: string) => void;
 }
 
+import { ConfirmModal } from './ConfirmModal';
+
 export const ProjectsModal: React.FC<ProjectsModalProps> = ({
   isOpen,
   onClose,
@@ -73,8 +75,10 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
   onToggleFavoriteProject,
 }) => {
   const [filterTab, setFilterTab] = useState<'all' | 'favorites'>('all');
+  const [projectToDelete, setProjectToDelete] = useState<SavedProject | null>(null);
 
   if (!isOpen) return null;
+
 
   const favoriteProjectsCount = savedProjects.filter(p => p.isFavorite).length;
   const filteredProjects = filterTab === 'favorites' 
@@ -273,7 +277,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
 
                     {/* Delete Project Button */}
                     <button
-                      onClick={() => onDeleteProject(proj.id)}
+                      onClick={() => setProjectToDelete(proj)}
                       className="p-1.5 bg-slate-900 hover:bg-red-950/60 border border-slate-700 hover:border-red-700 text-slate-400 hover:text-red-400 rounded text-xs transition-colors"
                       title="Excluir projeto salvo"
                     >
@@ -285,7 +289,24 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
             })
           )}
         </div>
+
+        {/* Confirmation Modal for Project Deletion */}
+        <ConfirmModal
+          isOpen={Boolean(projectToDelete)}
+          title="Excluir Projeto de Marcenaria"
+          message={`Tem certeza que deseja excluir o projeto "${projectToDelete?.name}"? Esta ação não pode ser desfeita.`}
+          confirmText="Sim, Excluir"
+          cancelText="Cancelar"
+          onConfirm={() => {
+            if (projectToDelete) {
+              onDeleteProject(projectToDelete.id);
+              setProjectToDelete(null);
+            }
+          }}
+          onCancel={() => setProjectToDelete(null)}
+        />
       </div>
     </div>
   );
 };
+

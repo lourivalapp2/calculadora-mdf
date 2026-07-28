@@ -7,6 +7,7 @@ import {
 
 import { MlProductData } from '../lib/mlScraper';
 import { fetchMlLibraryFromCloud, saveMlLibraryToCloud } from '../lib/supabase';
+import { ConfirmModal } from './ConfirmModal';
 
 interface MercadoLivreLibraryModalProps {
   isOpen: boolean;
@@ -30,7 +31,9 @@ export const MercadoLivreLibraryModal: React.FC<MercadoLivreLibraryModalProps> =
   onImportToProject,
 }) => {
   const [libraryItems, setLibraryItems] = useState<MlProductData[]>([]);
+  const [itemToDelete, setItemToDelete] = useState<MlProductData | null>(null);
   const [customCategories, setCustomCategories] = useState<string[]>(() => {
+
     try {
       const saved = localStorage.getItem('mdf-ml-custom-categories');
       return saved ? JSON.parse(saved) : [];
@@ -319,17 +322,21 @@ export const MercadoLivreLibraryModal: React.FC<MercadoLivreLibraryModalProps> =
     await saveMlLibraryToCloud(updated);
   };
 
-  const handleDeleteItem = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este produto da biblioteca?')) return;
+  const confirmDeleteItem = async () => {
+    if (!itemToDelete) return;
+    const id = itemToDelete.id;
+    const title = itemToDelete.title;
     const updated = safeItems.filter(item => item.id !== id);
     setLibraryItems(updated);
     await saveMlLibraryToCloud(updated);
-    showToast('Produto removido da biblioteca.');
+    showToast(`Produto "${title}" removido da biblioteca.`);
 
     if (editingId === id) {
       resetForm();
     }
+    setItemToDelete(null);
   };
+
 
   // Filter items safely with null checks
   const filteredItems = safeItems.filter(item => {
@@ -812,19 +819,7 @@ export const MercadoLivreLibraryModal: React.FC<MercadoLivreLibraryModalProps> =
 
                       {/* Col 6: Action Buttons (Alterar, Excluir, Usar no Projeto) */}
                       <div className="w-full lg:col-span-2 flex items-center justify-end gap-1.5 pt-2 lg:pt-0 border-t lg:border-0 border-slate-900">
-                        {onImportToProject && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onImportToProject(item);
-                              showToast(`"${item.title}" importado para os concorrentes!`);
-                            }}
-                            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-2 py-1 rounded text-[11px] transition-all cursor-pointer whitespace-nowrap"
-                            title="Importar preço e link para o projeto atual"
-                          >
-                            Usar
-                          </button>
-                        )}
+
 
                         <button
                           type="button"
@@ -838,7 +833,7 @@ export const MercadoLivreLibraryModal: React.FC<MercadoLivreLibraryModalProps> =
 
                         <button
                           type="button"
-                          onClick={() => handleDeleteItem(item.id)}
+                          onClick={() => setItemToDelete(item)}
                           className="bg-slate-900 hover:bg-red-950/40 border border-slate-800 hover:border-red-800/50 text-slate-400 hover:text-red-400 p-1.5 rounded transition-colors cursor-pointer"
                           title="Excluir produto da biblioteca"
                         >
@@ -852,7 +847,19 @@ export const MercadoLivreLibraryModal: React.FC<MercadoLivreLibraryModalProps> =
             )}
           </div>
         </div>
+
+        {/* Confirmation Modal for Product Deletion */}
+        <ConfirmModal
+          isOpen={Boolean(itemToDelete)}
+          title="Excluir Produto da Biblioteca"
+          message={`Tem certeza que deseja excluir "${itemToDelete?.title}"? Esta ação não pode ser desfeita.`}
+          confirmText="Sim, Excluir"
+          cancelText="Cancelar"
+          onConfirm={confirmDeleteItem}
+          onCancel={() => setItemToDelete(null)}
+        />
       </div>
     </div>
   );
 };
+
