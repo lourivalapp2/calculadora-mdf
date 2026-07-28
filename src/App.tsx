@@ -24,12 +24,14 @@ import {
   ExternalLink,
   Star,
   BarChart3,
+  ShoppingBag,
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { FurniturePreview } from './components/FurniturePreview';
 import { AiPieceExtractorModal } from './components/AiPieceExtractorModal';
 import { ProjectsModal, SavedProject, SalesScenario, FixedExpense, CompetitorItem } from './components/ProjectsModal';
 import { ExecutiveSummaryModal } from './components/ExecutiveSummaryModal';
+import { MercadoLivreLibraryModal } from './components/MercadoLivreLibraryModal';
 import { fetchProjectsFromCloud, saveProjectToCloud, deleteProjectFromCloud, isSupabaseConfigured } from './lib/supabase';
 
 export interface CostItem {
@@ -193,7 +195,26 @@ export default function App() {
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(isSupabaseConfigured());
   const [isProjectsModalOpen, setIsProjectsModalOpen] = useState<boolean>(false);
   const [isExecutiveSummaryOpen, setIsExecutiveSummaryOpen] = useState<boolean>(false);
+  const [isMlLibraryOpen, setIsMlLibraryOpen] = useState<boolean>(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  const handleImportMlProductToProject = (product: any) => {
+    if (competitorItems.length >= 5) {
+      alert('Seus concorrentes já possuem 5 itens cadastrados.');
+      return;
+    }
+    const newItem: CompetitorItem = {
+      id: `comp-${Date.now()}`,
+      price: product.price || 0,
+      link: product.url || '',
+    };
+    setCompetitorItems(prev => [...prev, newItem]);
+    if (product.imageUrl && !furnitureImages.includes(product.imageUrl)) {
+      setFurnitureImages(prev => [product.imageUrl, ...prev]);
+    }
+    setSaveToast(`Produto "${product.title}" importado para seu projeto!`);
+    setTimeout(() => setSaveToast(null), 3500);
+  };
 
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const simulationRef = useRef<HTMLDivElement>(null);
@@ -1701,6 +1722,16 @@ export default function App() {
                 )}
               </button>
 
+              {/* 4º: BIBLIOTECA MERCADO LIVRE */}
+              <button
+                onClick={() => setIsMlLibraryOpen(true)}
+                className="bg-slate-900 hover:bg-slate-800 border border-yellow-500/60 text-yellow-400 px-3.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer"
+                title="Abrir a Biblioteca de Produtos e Anúncios do Mercado Livre garimpados por categoria"
+              >
+                <ShoppingBag size={15} className="text-yellow-400" />
+                <span>📚 Biblioteca ML</span>
+              </button>
+
               {/* Visualizar PDF (relatório) */}
               <button
                 onClick={handleViewPDF}
@@ -1736,6 +1767,13 @@ export default function App() {
         savedProjects={savedProjects}
         onLoadProject={handleLoadProjectFromBrowser}
         onToggleFavoriteProject={handleToggleFavoriteProject}
+      />
+
+      {/* Mercado Livre Products Library Modal */}
+      <MercadoLivreLibraryModal
+        isOpen={isMlLibraryOpen}
+        onClose={() => setIsMlLibraryOpen(false)}
+        onImportToProject={handleImportMlProductToProject}
       />
 
       {/* Main Furniture Project Section */}

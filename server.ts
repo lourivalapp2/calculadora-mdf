@@ -160,6 +160,71 @@ Nota: As alturas (height) e larguras (width) devem estar em milímetros (mm).
     }
   });
 
+  // Mercado Libre Scraper Proxy Endpoint
+  app.get("/api/scrape-ml", async (req, res) => {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: "URL inválida" });
+    }
+
+    try {
+      // 1. Check if URL contains MLB item ID
+      const mlbMatch = url.match(/MLB-?(\d+)/i);
+      if (mlbMatch && mlbMatch[1]) {
+        const itemId = `MLB${mlbMatch[1]}`;
+        const itemRes = await fetch(`https://api.mercadolivre.com/items/${itemId}`);
+        if (itemRes.ok) {
+          const itemData: any = await itemRes.json();
+          let categoryName = "Móveis e Decoração";
+          if (itemData.category_id) {
+            try {
+              const catRes = await fetch(`https://api.mercadolivre.com/categories/${itemData.category_id}`);
+              if (catRes.ok) {
+                const catData: any = await catRes.json();
+                categoryName = catData.name || categoryName;
+              }
+            } catch (e) {}
+          }
+          return res.json({
+            title: itemData.title || "Produto Mercado Livre",
+            price: itemData.price || 0,
+            soldQuantity: itemData.sold_quantity || 0,
+            imageUrl: itemData.pictures?.[0]?.secure_url || itemData.thumbnail || "",
+            categoryName,
+          });
+        }
+      }
+
+      // 2. Fallback HTML meta tags scraper
+      const pageRes = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'pt-BR,pt;q=0.9',
+        }
+      });
+      if (!pageRes.ok) {
+        return res.json({ error: "Não foi possível acessar a página do Mercado Livre" });
+      }
+
+      const html = await pageRes.text();
+      const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/i) || html.match(/<title>([^<]+)<\/title>/i);
+      const imageMatch = html.match(/<meta property="og:image" content="([^"]+)"/i);
+      const priceMatch = html.match(/<meta property="product:price:amount" content="([^"]+)"/i) || html.match(/"price":\s*(\d+(?:\.\d+)?)/i);
+      const soldMatch = html.match(/(\d+)\s*vendido/i) || html.match(/(\d+)\s*unidades vendidas/i);
+
+      return res.json({
+        title: titleMatch ? titleMatch[1].replace(' | MercadoLivre', '').trim() : 'Produto Mercado Livre',
+        price: priceMatch ? parseFloat(priceMatch[1]) : 0,
+        soldQuantity: soldMatch ? parseInt(soldMatch[1]) : 0,
+        imageUrl: imageMatch ? imageMatch[1] : '',
+        categoryName: 'Móveis e Decoração',
+      });
+    } catch (err: any) {
+      console.error("Erro no scraping ML:", err);
+      return res.status(500).json({ error: "Erro ao extrair dados da página." });
+    }
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: false },

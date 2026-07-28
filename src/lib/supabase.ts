@@ -70,7 +70,7 @@ export const fetchProjectsFromCloud = async (): Promise<{
     }
 
     if (data) {
-      const filteredRows = data.filter(row => row.id !== '__global_analysis_scenarios__');
+      const filteredRows = data.filter(row => row.id !== '__global_analysis_scenarios__' && row.id !== '__global_ml_library__');
       const cloudProjects: SavedProject[] = filteredRows.map(row => {
         // If data column is a JSON object or stringified JSON
         const parsedData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
@@ -91,6 +91,74 @@ export const fetchProjectsFromCloud = async (): Promise<{
   } catch (err: any) {
     console.error('Erro na requisição Supabase:', err);
     return { projects: localProjects, isCloud: false, error: err.message || 'Erro de conexão' };
+  }
+};
+
+/**
+ * Fetches Mercado Livre products library from Supabase Cloud with fallback to localStorage
+ */
+export const fetchMlLibraryFromCloud = async (): Promise<any[]> => {
+  const LOCAL_ML_KEY = 'mdf-ml-library-v1';
+  let localItems: any[] = [];
+  try {
+    const raw = localStorage.getItem(LOCAL_ML_KEY);
+    if (raw) localItems = JSON.parse(raw);
+  } catch (e) {
+    console.error('Erro ao ler biblioteca ML local:', e);
+  }
+
+  if (!isSupabaseConfigured() || !supabase) {
+    return localItems;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', '__global_ml_library__')
+      .single();
+
+    if (error || !data) {
+      return localItems;
+    }
+
+    const parsedData = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
+    const cloudItems = parsedData?.items || localItems;
+    try {
+      localStorage.setItem(LOCAL_ML_KEY, JSON.stringify(cloudItems));
+    } catch (e) {}
+    return cloudItems;
+  } catch (e) {
+    return localItems;
+  }
+};
+
+/**
+ * Saves Mercado Livre products library array to Supabase Cloud and syncs to localStorage
+ */
+export const saveMlLibraryToCloud = async (items: any[]): Promise<boolean> => {
+  const LOCAL_ML_KEY = 'mdf-ml-library-v1';
+  try {
+    localStorage.setItem(LOCAL_ML_KEY, JSON.stringify(items));
+  } catch (e) {}
+
+  if (!isSupabaseConfigured() || !supabase) {
+    return false;
+  }
+
+  try {
+    const { error } = await supabase.from('projects').upsert(
+      {
+        id: '__global_ml_library__',
+        name: 'Biblioteca de Produtos Mercado Livre',
+        updated_at: new Date().toISOString(),
+        data: { items },
+      },
+      { onConflict: 'id' }
+    );
+    return !error;
+  } catch (e) {
+    return false;
   }
 };
 
