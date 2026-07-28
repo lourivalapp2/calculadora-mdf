@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { packPieces, Piece, EdgeTapeOption, EDGE_TAPE_LABELS, calculatePieceEdgeTapeMeters } from './lib/packing';
 import {
   Plus,
@@ -397,8 +397,8 @@ export default function App() {
     }
   }, [projectName, pieces, costs, sheetWidth, sheetHeight, furnitureQty, furnitureImages, competitorItems, backPieces, backSheetWidth, backSheetHeight, salesScenarios, workDaysPerMonth, taxRate, mlFeeRate, targetNetMargin, includeFixedInMarkup, selectedScenarioId, fixedExpenses, currentProjectId]);
 
-  // Explicit Save Project to Browser / Supabase Cloud
-  const handleSaveProjectToBrowser = async () => {
+  // Explicit Save Project to Browser / Supabase Cloud (with Auto-Save support)
+  const handleSaveProjectToBrowser = useCallback(async (isAutoSave: boolean = false) => {
     const projId = currentProjectId || `proj-${Date.now()}`;
     const existingProj = savedProjects.find(p => p.id === projId);
 
@@ -446,10 +446,25 @@ export default function App() {
       return updatedList;
     });
 
-    const destinationText = result.isCloud ? 'na nuvem (Supabase)' : 'no navegador';
-    setSaveToast(`Projeto "${projectToSave.name}" salvo com sucesso ${destinationText}! (${pieces.length} peças)`);
+    if (isAutoSave) {
+      setSaveToast(`⏱️ Salvamento automático efetuado! (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`);
+    } else {
+      const destinationText = result.isCloud ? 'na nuvem (Supabase)' : 'no navegador';
+      setSaveToast(`Projeto "${projectToSave.name}" salvo com sucesso ${destinationText}! (${pieces.length} peças)`);
+    }
     setTimeout(() => setSaveToast(null), 3500);
-  };
+  }, [currentProjectId, savedProjects, projectName, sheetWidth, sheetHeight, furnitureQty, pieces, costs, furnitureImages, competitorItems, backPieces, backSheetWidth, backSheetHeight, salesScenarios, workDaysPerMonth, taxRate, mlFeeRate, targetNetMargin, includeFixedInMarkup, selectedScenarioId, fixedExpenses]);
+
+  // Auto-Save Interval Effect (Every 1 Minute / 60,000 ms)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (pieces.length > 0 || costs.length > 0 || projectName !== 'Novo Projeto de Marcenaria') {
+        handleSaveProjectToBrowser(true);
+      }
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, [handleSaveProjectToBrowser, pieces.length, costs.length, projectName]);
 
   // Load Project from Browser Saved List
   const handleLoadProjectFromBrowser = (project: SavedProject) => {
@@ -1649,9 +1664,29 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap gap-3 items-center">
-            {/* Project Management Actions */}
+            {/* Project Management Actions in Order: 1. Salvar (Verde), 2. Meus Projetos, 3. Resumo Gerencial */}
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Executive Summary & DRE Button */}
+              {/* 1º: BOTÃO SALVAR (EM VERDE DESTAQUE) */}
+              <button
+                onClick={() => handleSaveProjectToBrowser(false)}
+                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 shadow-md shadow-emerald-950/40 border border-emerald-400/60 cursor-pointer"
+                title="Salvar este projeto no banco de dados Supabase (Auto-salvamento a cada 1 minuto ativado)"
+              >
+                <Save size={15} className="text-slate-950" />
+                <span>Salvar</span>
+              </button>
+
+              {/* 2º: MEUS PROJETOS */}
+              <button
+                onClick={() => setIsProjectsModalOpen(true)}
+                className="bg-slate-900 hover:bg-slate-800 border border-amber-500/50 text-amber-400 px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer"
+                title="Abrir gerenciador de múltiplos projetos salvos no navegador"
+              >
+                <FolderKanban size={14} />
+                <span>Meus Projetos ({savedProjects.length})</span>
+              </button>
+
+              {/* 3º: RESUMO GERENCIAL */}
               <button
                 onClick={() => setIsExecutiveSummaryOpen(true)}
                 className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 px-3.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all active:scale-95 shadow-md shadow-amber-500/20 cursor-pointer"
@@ -1666,62 +1701,15 @@ export default function App() {
                 )}
               </button>
 
-              {/* Browser LocalStorage Multi-Project Manager Button */}
+              {/* Visualizar PDF (relatório) */}
               <button
-                onClick={() => setIsProjectsModalOpen(true)}
-                className="bg-slate-900 hover:bg-slate-800 border border-amber-500/50 text-amber-400 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
-                title="Abrir gerenciador de múltiplos projetos salvos no navegador"
+                onClick={handleViewPDF}
+                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                title="Visualizar o relatório PDF em uma nova aba do navegador"
               >
-                <FolderKanban size={14} />
-                <span>Meus Projetos ({savedProjects.length})</span>
+                <Eye size={14} />
+                <span>Visualizar PDF</span>
               </button>
-
-              {/* Save Active Project */}
-              <button
-                onClick={handleSaveProjectToBrowser}
-                className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
-                title="Salvar este projeto no banco de dados Supabase"
-              >
-                <Save size={14} className="text-slate-950" />
-                <span>Salvar</span>
-              </button>
-
-              {/* Save/Load JSON Files */}
-              <button
-                onClick={handleSaveProjectJson}
-                className="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition-all active:scale-95"
-                title="Baixar arquivo .JSON no computador"
-              >
-                <Download size={13} className="text-slate-400" />
-                <span>JSON</span>
-              </button>
-
-              <label className="cursor-pointer bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition-all active:scale-95">
-                <Upload size={13} className="text-slate-400" />
-                <span>Abrir JSON</span>
-                <input type="file" accept=".json" onChange={handleLoadProjectJson} className="hidden" />
-              </label>
-
-              {/* PDF Actions: Visualizar no Navegador & Baixar */}
-              <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
-                <button
-                  onClick={handleViewPDF}
-                  className="bg-slate-900 hover:bg-slate-800 border border-amber-500/60 text-amber-400 px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm"
-                  title="Visualizar o relatório PDF em uma nova aba do navegador"
-                >
-                  <Eye size={14} />
-                  <span>Visualizar PDF</span>
-                </button>
-
-                <button
-                  onClick={handleDownloadPDF}
-                  className="bg-amber-500 hover:bg-amber-400 text-black px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
-                  title="Baixar o arquivo PDF para o seu computador"
-                >
-                  <Download size={14} />
-                  <span>Baixar PDF</span>
-                </button>
-              </div>
             </div>
           </div>
         </div>
