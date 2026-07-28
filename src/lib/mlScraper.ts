@@ -33,31 +33,46 @@ export async function extractMlProductDetails(url: string): Promise<MlProductDat
 
   let title = 'Produto Mercado Livre';
   let price = 0;
-  let soldQuantity: number | string = 0;
+  let soldQuantity: number | string = '0';
   let imageUrl = '';
   let categoryName = 'Geral / Outros';
   let categoryId = '';
 
-  // 1. Try fetching via Mercado Livre Official Public API if itemId was found
-  if (itemId) {
+  // 1. Tenta extrair via rota proxy /api/scrape-ml que possui parser completo de HTML og:title, og:image e breadcrumbs
+  try {
+    const proxyRes = await fetch(`/api/scrape-ml?url=${encodeURIComponent(cleanUrl)}`);
+    if (proxyRes.ok) {
+      const proxyData = await proxyRes.json();
+      if (proxyData.title) title = proxyData.title;
+      if (proxyData.price) price = proxyData.price;
+      if (proxyData.soldQuantity) soldQuantity = proxyData.soldQuantity;
+      if (proxyData.imageUrl) imageUrl = proxyData.imageUrl;
+      if (proxyData.categoryName) categoryName = proxyData.categoryName;
+    }
+  } catch (e) {
+    console.warn('Erro ao chamar proxy /api/scrape-ml:', e);
+  }
+
+  // 2. Se título ou dados ainda estiverem genéricos, tenta API pública do Mercado Livre
+  if (itemId && (title === 'Produto Mercado Livre' || price === 0)) {
     try {
       const itemRes = await fetch(`https://api.mercadolivre.com/items/${itemId}`);
       if (itemRes.ok) {
         const itemData = await itemRes.json();
         
-        title = itemData.title || title;
-        price = typeof itemData.price === 'number' ? itemData.price : parseFloat(itemData.price || '0');
-        soldQuantity = itemData.sold_quantity !== undefined ? itemData.sold_quantity : 0;
+        if (title === 'Produto Mercado Livre') title = itemData.title || title;
+        if (price === 0) price = typeof itemData.price === 'number' ? itemData.price : parseFloat(itemData.price || '0');
+        if (!soldQuantity || soldQuantity === '0') soldQuantity = itemData.sold_quantity !== undefined ? itemData.sold_quantity : 0;
         
-        // High-resolution image url
-        if (itemData.pictures && itemData.pictures.length > 0) {
-          imageUrl = itemData.pictures[0].secure_url || itemData.pictures[0].url || '';
-        } else if (itemData.thumbnail) {
-          imageUrl = itemData.thumbnail.replace('-I.jpg', '-O.jpg').replace('http://', 'https://');
+        if (!imageUrl) {
+          if (itemData.pictures && itemData.pictures.length > 0) {
+            imageUrl = itemData.pictures[0].secure_url || itemData.pictures[0].url || '';
+          } else if (itemData.thumbnail) {
+            imageUrl = itemData.thumbnail.replace('-I.jpg', '-O.jpg').replace('http://', 'https://');
+          }
         }
 
-        // Fetch category name
-        if (itemData.category_id) {
+        if (itemData.category_id && categoryName === 'Geral / Outros') {
           categoryId = itemData.category_id;
           try {
             const catRes = await fetch(`https://api.mercadolivre.com/categories/${itemData.category_id}`);
@@ -65,35 +80,12 @@ export async function extractMlProductDetails(url: string): Promise<MlProductDat
               const catData = await catRes.json();
               if (catData.name) {
                 categoryName = catData.name;
-              } else if (catData.path_from_root && catData.path_from_root.length > 0) {
-                categoryName = catData.path_from_root.map((c: any) => c.name).join(' > ');
               }
             }
-          } catch (catErr) {
-            console.warn('Erro ao buscar categoria ML:', catErr);
-          }
+          } catch (catErr) {}
         }
       }
-    } catch (err) {
-      console.warn('Erro ao buscar API do Mercado Livre no cliente:', err);
-    }
-  }
-
-  // 2. If client API call failed or missing image/title, attempt backend proxy fetch
-  if (!imageUrl || price === 0 || title === 'Produto Mercado Livre') {
-    try {
-      const proxyRes = await fetch(`/api/scrape-ml?url=${encodeURIComponent(cleanUrl)}`);
-      if (proxyRes.ok) {
-        const proxyData = await proxyRes.json();
-        if (proxyData.title && title === 'Produto Mercado Livre') title = proxyData.title;
-        if (proxyData.price && price === 0) price = proxyData.price;
-        if (proxyData.soldQuantity && !soldQuantity) soldQuantity = proxyData.soldQuantity;
-        if (proxyData.imageUrl && !imageUrl) imageUrl = proxyData.imageUrl;
-        if (proxyData.categoryName && categoryName === 'Geral / Outros') categoryName = proxyData.categoryName;
-      }
-    } catch (e) {
-      console.warn('Erro na rota proxy de scraping:', e);
-    }
+    } catch (err) {}
   }
 
   return {

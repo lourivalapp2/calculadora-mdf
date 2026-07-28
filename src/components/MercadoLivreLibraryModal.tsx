@@ -195,52 +195,85 @@ export const MercadoLivreLibraryModal: React.FC<MercadoLivreLibraryModalProps> =
             <div className="bg-slate-900 border-2 border-yellow-500/80 p-4 rounded-xl space-y-3 shadow-xl animate-fadeIn">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                 <span className="text-xs font-bold text-yellow-400 flex items-center gap-1 uppercase tracking-wide">
-                  <Check size={14} /> Pré-visualização do Produto Extraído
+                  <Check size={14} /> Dados Extraídos do Anúncio (Revise ou edite se desejar)
                 </span>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {extractedPreview.categoryName}
+                <span className="text-[11px] text-amber-300 font-mono font-bold bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded">
+                  🏷️ Categoria: {extractedPreview.categoryName}
                 </span>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                <div className="flex gap-3 items-center flex-1 min-w-0">
-                  {extractedPreview.imageUrl && (
-                    <img
-                      src={extractedPreview.imageUrl}
-                      alt={extractedPreview.title}
-                      className="w-16 h-16 object-cover rounded-lg border border-slate-800 shrink-0 bg-slate-950"
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                {/* Image Thumbnail */}
+                <div className="sm:col-span-2 flex justify-center">
+                  <img
+                    src={extractedPreview.imageUrl || 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&auto=format&fit=crop&q=60'}
+                    alt={extractedPreview.title}
+                    className="w-20 h-20 object-cover rounded-lg border border-slate-700 bg-slate-950 shadow-md"
+                  />
+                </div>
+
+                {/* Editable Fields */}
+                <div className="sm:col-span-10 space-y-2 text-xs">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Nome do Produto:</label>
+                    <input
+                      type="text"
+                      value={extractedPreview.title}
+                      onChange={e => setExtractedPreview({ ...extractedPreview, title: e.target.value })}
+                      className="bg-slate-950 border border-slate-700 text-slate-100 font-bold p-2 rounded w-full focus:outline-none focus:border-amber-500"
                     />
-                  )}
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <h4 className="text-sm font-bold text-slate-100 truncate" title={extractedPreview.title}>
-                      {extractedPreview.title}
-                    </h4>
-                    <div className="flex items-center gap-3 text-xs font-mono">
-                      <span className="text-amber-400 font-extrabold text-sm">
-                        R$ {extractedPreview.price ? extractedPreview.price.toFixed(2).replace('.', ',') : '0,00'}
-                      </span>
-                      <span className="bg-slate-950 text-slate-300 border border-slate-800 px-2 py-0.5 rounded text-[11px]">
-                        🛒 {extractedPreview.soldQuantity} vendidos
-                      </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Valor de Venda (R$):</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={extractedPreview.price}
+                        onChange={e => setExtractedPreview({ ...extractedPreview, price: parseFloat(e.target.value) || 0 })}
+                        className="bg-slate-950 border border-slate-700 text-amber-400 font-mono font-bold p-2 rounded w-full focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Total Vendido:</label>
+                      <input
+                        type="text"
+                        value={extractedPreview.soldQuantity}
+                        onChange={e => setExtractedPreview({ ...extractedPreview, soldQuantity: e.target.value })}
+                        className="bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold p-2 rounded w-full focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Categoria ML:</label>
+                      <input
+                        type="text"
+                        value={extractedPreview.categoryName}
+                        onChange={e => setExtractedPreview({ ...extractedPreview, categoryName: e.target.value })}
+                        className="bg-slate-950 border border-slate-700 text-slate-200 p-2 rounded w-full focus:outline-none focus:border-amber-500"
+                      />
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={handleSaveExtracted}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
-                  >
-                    <Plus size={14} />
-                    <span>Salvar na Biblioteca</span>
-                  </button>
-                  <button
-                    onClick={() => setExtractedPreview(null)}
-                    className="text-slate-400 hover:text-slate-200 p-2 rounded-lg"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+              {/* Actions */}
+              <div className="flex justify-end items-center gap-2 pt-2 border-t border-slate-800">
+                <button
+                  onClick={() => setExtractedPreview(null)}
+                  className="text-slate-400 hover:text-slate-200 text-xs px-3 py-2 rounded"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveExtracted}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>Salvar na Biblioteca</span>
+                </button>
               </div>
             </div>
           )}

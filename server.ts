@@ -160,7 +160,7 @@ Nota: As alturas (height) e larguras (width) devem estar em milímetros (mm).
     }
   });
 
-  // Mercado Libre Scraper Proxy Endpoint
+  // Mercado Libre Scraper Proxy Endpoint (Alta Precisão)
   app.get("/api/scrape-ml", async (req, res) => {
     const { url } = req.query;
     if (!url || typeof url !== 'string') {
@@ -168,57 +168,135 @@ Nota: As alturas (height) e larguras (width) devem estar em milímetros (mm).
     }
 
     try {
-      // 1. Check if URL contains MLB item ID
-      const mlbMatch = url.match(/MLB-?(\d+)/i);
-      if (mlbMatch && mlbMatch[1]) {
-        const itemId = `MLB${mlbMatch[1]}`;
-        const itemRes = await fetch(`https://api.mercadolivre.com/items/${itemId}`);
-        if (itemRes.ok) {
-          const itemData: any = await itemRes.json();
-          let categoryName = "Móveis e Decoração";
-          if (itemData.category_id) {
-            try {
-              const catRes = await fetch(`https://api.mercadolivre.com/categories/${itemData.category_id}`);
-              if (catRes.ok) {
-                const catData: any = await catRes.json();
-                categoryName = catData.name || categoryName;
-              }
-            } catch (e) {}
-          }
-          return res.json({
-            title: itemData.title || "Produto Mercado Livre",
-            price: itemData.price || 0,
-            soldQuantity: itemData.sold_quantity || 0,
-            imageUrl: itemData.pictures?.[0]?.secure_url || itemData.thumbnail || "",
-            categoryName,
-          });
-        }
-      }
+      const cleanUrl = url.trim();
 
-      // 2. Fallback HTML meta tags scraper
-      const pageRes = await fetch(url, {
+      // Fetch HTML directly from Mercado Livre
+      const pageRes = await fetch(cleanUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           'Accept-Language': 'pt-BR,pt;q=0.9',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         }
       });
+
       if (!pageRes.ok) {
-        return res.json({ error: "Não foi possível acessar a página do Mercado Livre" });
+        return res.status(500).json({ error: "Não foi possível acessar o anúncio do Mercado Livre" });
       }
 
       const html = await pageRes.text();
-      const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/i) || html.match(/<title>([^<]+)<\/title>/i);
-      const imageMatch = html.match(/<meta property="og:image" content="([^"]+)"/i);
-      const priceMatch = html.match(/<meta property="product:price:amount" content="([^"]+)"/i) || html.match(/"price":\s*(\d+(?:\.\d+)?)/i);
-      const soldMatch = html.match(/(\d+)\s*vendido/i) || html.match(/(\d+)\s*unidades vendidas/i);
+
+      // 1. Extração Precisa de Título e Preço via <meta property="og:title" content="...">
+      // Exemplo no código do site: content="Mesinha Lateral Redonda Monopé Mesa De Apoio Para Sofá Cor Mel - R$ 104,99"
+      let title = "";
+      let price = 0;
+
+      const ogTitleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i) ||
+                           html.match(/<meta\s+name="twitter:title"\s+content="([^"]+)"/i);
+
+      if (ogTitleMatch && ogTitleMatch[1]) {
+        const fullContent = ogTitleMatch[1].trim();
+        // Verifica se contém " - R$ " dividindo Nome do Produto e Preço
+        const splitMatch = fullContent.match(/^(.*?)\s*-\s*R\$\s*([\d\.,]+)$/i);
+        if (splitMatch) {
+          title = splitMatch[1].trim();
+          const priceRaw = splitMatch[2].replace('.', '').replace(',', '.');
+          price = parseFloat(priceRaw) || 0;
+        } else {
+          title = fullContent.replace(/\s*\|\s*MercadoLivre$/i, '').trim();
+        }
+      }
+
+      // Fallback de Título se og:title falhar
+      if (!title) {
+        const h1Match = html.match(/<h1[^>]*class="[^"]*ui-pdp-title[^"]*"[^>]*>([^<]+)<\/h1>/i) ||
+                        html.match(/<title>([^<]+)<\/title>/i);
+        if (h1Match) {
+          title = h1Match[1].replace(/\s*\|\s*MercadoLivre$/i, '').trim();
+        }
+      }
+
+      // Fallback de Preço se não foi extraído do og:title
+      if (price === 0) {
+        const priceMetaMatch = html.match(/<meta\s+property="product:price:amount"\content="([^"]+)"/i) ||
+                               html.match(/<meta\s+itemprop="price"\s+content="([^"]+)"/i) ||
+                               html.match(/"price"\s*:\s*([\d\.]+)/i);
+        if (priceMetaMatch) {
+          price = parseFloat(priceMetaMatch[1]) || 0;
+        }
+      }
+
+      // 2. Extração da Primeira Foto do Produto (Foto Principal em alta resolução)
+      let imageUrl = "";
+      const ogImageMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i) ||
+                            html.match(/<meta\s+name="twitter:image"\s+content="([^"]+)"/i);
+      if (ogImageMatch && ogImageMatch[1]) {
+        imageUrl = ogImageMatch[1];
+      }
+
+      // 3. Extração da Categoria (Sempre o ÚLTIMO item da lista de breadcrumbs)
+      // Ex: Casa, Móveis e Decoração > Móveis para Casa > Mesas de Cabeceira -> "Mesas de Cabeceira"
+      let categoryName = "Móveis para Casa";
+      const breadcrumbMatches = Array.from(html.matchAll(/class="andes-breadcrumb__link"[^>]*>([^<]+)<\/a>/gi));
+      if (breadcrumbMatches.length > 0) {
+        const lastBreadcrumb = breadcrumbMatches[breadcrumbMatches.length - 1][1].trim();
+        if (lastBreadcrumb) {
+          categoryName = lastBreadcrumb;
+        }
+      } else {
+        // Tenta regex alternativa de breadcrumb
+        const altBreadcrumbMatches = Array.from(html.matchAll(/itemprop="name"[^>]*>([^<]+)<\/span>/gi));
+        if (altBreadcrumbMatches.length > 0) {
+          const lastItem = altBreadcrumbMatches[altBreadcrumbMatches.length - 1][1].trim();
+          if (lastItem && !lastItem.toLowerCase().includes('mercado livre')) {
+            categoryName = lastItem;
+          }
+        }
+      }
+
+      // 4. Extração de Total Vendido (ex: +1000 vendidos)
+      let soldQuantity: number | string = 0;
+      const soldMatch = html.match(/(\+?\d+)\s*vendidos?/i) ||
+                        html.match(/Novo\s*\|\s*(\+?\d+\s*vendidos?)/i) ||
+                        html.match(/"sold_quantity"\s*:\s*(\d+)/i);
+      if (soldMatch) {
+        soldQuantity = soldMatch[1];
+      }
+
+      // 5. Caso itemId MLB esteja presente, podemos complementar via API oficial do ML
+      const mlbMatch = cleanUrl.match(/MLB-?(\d+)/i);
+      if (mlbMatch && mlbMatch[1]) {
+        const itemId = `MLB${mlbMatch[1]}`;
+        try {
+          const itemRes = await fetch(`https://api.mercadolivre.com/items/${itemId}`);
+          if (itemRes.ok) {
+            const apiData: any = await itemRes.json();
+            if (!title || title === "Produto Mercado Livre") title = apiData.title || title;
+            if (price === 0) price = apiData.price || price;
+            if (!soldQuantity) soldQuantity = apiData.sold_quantity || 0;
+            if (!imageUrl && apiData.pictures?.[0]?.secure_url) {
+              imageUrl = apiData.pictures[0].secure_url;
+            }
+            if (apiData.category_id) {
+              try {
+                const catRes = await fetch(`https://api.mercadolivre.com/categories/${apiData.category_id}`);
+                if (catRes.ok) {
+                  const catData: any = await catRes.json();
+                  if (catData.name) categoryName = catData.name;
+                }
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }
 
       return res.json({
-        title: titleMatch ? titleMatch[1].replace(' | MercadoLivre', '').trim() : 'Produto Mercado Livre',
-        price: priceMatch ? parseFloat(priceMatch[1]) : 0,
-        soldQuantity: soldMatch ? parseInt(soldMatch[1]) : 0,
-        imageUrl: imageMatch ? imageMatch[1] : '',
-        categoryName: 'Móveis e Decoração',
+        title: title || 'Produto Mercado Livre',
+        price,
+        soldQuantity: soldQuantity || '0',
+        imageUrl: imageUrl || 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&auto=format&fit=crop&q=60',
+        categoryName,
       });
+
     } catch (err: any) {
       console.error("Erro no scraping ML:", err);
       return res.status(500).json({ error: "Erro ao extrair dados da página." });
