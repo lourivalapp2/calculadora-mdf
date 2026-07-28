@@ -11,6 +11,19 @@ export interface MlProductData {
   createdAt: string;
 }
 
+export interface PurchaseProductData {
+  id: string;
+  url: string;
+  title: string;
+  price: number;
+  categoryName: string;
+  imageUrl?: string;
+  notes?: string;
+  isFavorite?: boolean;
+  createdAt: string;
+}
+
+
 /**
  * Extracts Mercado Libre Item ID (MLB...) from a URL string
  */

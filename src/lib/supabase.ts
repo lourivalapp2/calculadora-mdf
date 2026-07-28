@@ -70,7 +70,12 @@ export const fetchProjectsFromCloud = async (): Promise<{
     }
 
     if (data) {
-      const filteredRows = data.filter(row => row.id !== '__global_analysis_scenarios__' && row.id !== '__global_ml_library__');
+      const filteredRows = data.filter(row => 
+        row.id !== '__global_analysis_scenarios__' && 
+        row.id !== '__global_ml_library__' &&
+        row.id !== '__global_purchase_library__'
+      );
+
       const cloudProjects: SavedProject[] = filteredRows.map(row => {
         // If data column is a JSON object or stringified JSON
         const parsedData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
@@ -161,6 +166,75 @@ export const saveMlLibraryToCloud = async (items: any[]): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * Fetches Purchase Products library from Supabase Cloud with fallback to localStorage
+ */
+export const fetchPurchaseLibraryFromCloud = async (): Promise<any[]> => {
+  const LOCAL_PURCHASE_KEY = 'mdf-purchase-library-v1';
+  let localItems: any[] = [];
+  try {
+    const raw = localStorage.getItem(LOCAL_PURCHASE_KEY);
+    if (raw) localItems = JSON.parse(raw);
+  } catch (e) {
+    console.error('Erro ao ler biblioteca de compras local:', e);
+  }
+
+  if (!isSupabaseConfigured() || !supabase) {
+    return localItems;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', '__global_purchase_library__')
+      .single();
+
+    if (error || !data) {
+      return localItems;
+    }
+
+    const parsedData = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
+    const cloudItems = parsedData?.items || localItems;
+    try {
+      localStorage.setItem(LOCAL_PURCHASE_KEY, JSON.stringify(cloudItems));
+    } catch (e) {}
+    return cloudItems;
+  } catch (e) {
+    return localItems;
+  }
+};
+
+/**
+ * Saves Purchase Products library array to Supabase Cloud and syncs to localStorage
+ */
+export const savePurchaseLibraryToCloud = async (items: any[]): Promise<boolean> => {
+  const LOCAL_PURCHASE_KEY = 'mdf-purchase-library-v1';
+  try {
+    localStorage.setItem(LOCAL_PURCHASE_KEY, JSON.stringify(items));
+  } catch (e) {}
+
+  if (!isSupabaseConfigured() || !supabase) {
+    return false;
+  }
+
+  try {
+    const { error } = await supabase.from('projects').upsert(
+      {
+        id: '__global_purchase_library__',
+        name: 'Biblioteca de Produtos para Compra',
+        updated_at: new Date().toISOString(),
+        data: { items },
+      },
+      { onConflict: 'id' }
+    );
+    return !error;
+  } catch (e) {
+    return false;
+  }
+};
+
 
 /**
  * Fetches saved analysis scenarios from Supabase Cloud with fallback to localStorage

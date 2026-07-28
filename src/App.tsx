@@ -25,6 +25,7 @@ import {
   Star,
   BarChart3,
   ShoppingBag,
+  ShoppingCart,
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { FurniturePreview } from './components/FurniturePreview';
@@ -32,7 +33,10 @@ import { AiPieceExtractorModal } from './components/AiPieceExtractorModal';
 import { ProjectsModal, SavedProject, SalesScenario, FixedExpense, CompetitorItem } from './components/ProjectsModal';
 import { ExecutiveSummaryModal } from './components/ExecutiveSummaryModal';
 import { MercadoLivreLibraryModal } from './components/MercadoLivreLibraryModal';
+import { PurchaseLibraryModal } from './components/PurchaseLibraryModal';
+import { PurchaseProductData } from './lib/mlScraper';
 import { fetchProjectsFromCloud, saveProjectToCloud, deleteProjectFromCloud, isSupabaseConfigured } from './lib/supabase';
+
 
 export interface CostItem {
   id: string;
@@ -196,6 +200,7 @@ export default function App() {
   const [isProjectsModalOpen, setIsProjectsModalOpen] = useState<boolean>(false);
   const [isExecutiveSummaryOpen, setIsExecutiveSummaryOpen] = useState<boolean>(false);
   const [isMlLibraryOpen, setIsMlLibraryOpen] = useState<boolean>(false);
+  const [isPurchaseLibraryOpen, setIsPurchaseLibraryOpen] = useState<boolean>(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
 
   const handleImportMlProductToProject = (product: any) => {
@@ -215,6 +220,19 @@ export default function App() {
     setSaveToast(`Produto "${product.title}" importado para seu projeto!`);
     setTimeout(() => setSaveToast(null), 3500);
   };
+
+  const handleImportPurchaseProductToProject = (product: PurchaseProductData) => {
+    const newCostItem: CostItem = {
+      id: `cost-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      name: product.title,
+      unitPrice: product.price || 0,
+      quantity: 1,
+    };
+    setCosts(prev => [...prev, newCostItem]);
+    setSaveToast(`Item "${product.title}" lançado nos Insumos do Projeto!`);
+    setTimeout(() => setSaveToast(null), 3500);
+  };
+
 
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const simulationRef = useRef<HTMLDivElement>(null);
@@ -1722,15 +1740,26 @@ export default function App() {
                 )}
               </button>
 
-              {/* 4º: BIBLIOTECA MERCADO LIVRE */}
+              {/* 4º: BIBLIOTECA MERCADO LIVRE (VENDAS) */}
               <button
                 onClick={() => setIsMlLibraryOpen(true)}
                 className="bg-slate-900 hover:bg-slate-800 border border-yellow-500/60 text-yellow-400 px-3.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer"
-                title="Abrir a Biblioteca de Produtos e Anúncios do Mercado Livre garimpados por categoria"
+                title="Abrir a Biblioteca de Produtos e Anúncios do Mercado Livre (Vendas)"
               >
                 <ShoppingBag size={15} className="text-yellow-400" />
-                <span>📚 Biblioteca ML</span>
+                <span>📚 Biblioteca Vendas</span>
               </button>
+
+              {/* 5º: BIBLIOTECA DE COMPRAS */}
+              <button
+                onClick={() => setIsPurchaseLibraryOpen(true)}
+                className="bg-slate-900 hover:bg-slate-800 border border-emerald-500/60 text-emerald-400 px-3.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer"
+                title="Abrir a Biblioteca de Produtos e Materiais para Compra"
+              >
+                <ShoppingCart size={15} className="text-emerald-400" />
+                <span>🛒 Produtos p/ Compra</span>
+              </button>
+
 
               {/* Visualizar PDF (relatório) */}
               <button
@@ -1769,12 +1798,20 @@ export default function App() {
         onToggleFavoriteProject={handleToggleFavoriteProject}
       />
 
-      {/* Mercado Livre Products Library Modal */}
+      {/* Mercado Livre Products Library Modal (Vendas) */}
       <MercadoLivreLibraryModal
         isOpen={isMlLibraryOpen}
         onClose={() => setIsMlLibraryOpen(false)}
         onImportToProject={handleImportMlProductToProject}
       />
+
+      {/* Purchase Products Library Modal (Compras) */}
+      <PurchaseLibraryModal
+        isOpen={isPurchaseLibraryOpen}
+        onClose={() => setIsPurchaseLibraryOpen(false)}
+        onImportToProject={handleImportPurchaseProductToProject}
+      />
+
 
       {/* Main Furniture Project Section */}
       <section className="bg-slate-900 border border-slate-800 p-6 rounded-lg shadow-lg mb-8">
