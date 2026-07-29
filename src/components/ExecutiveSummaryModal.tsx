@@ -66,17 +66,19 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
     }
   }, [isOpen]);
 
+  const getProjectDailySales = (p: SavedProject) => p.dailySales !== undefined ? p.dailySales : (p.furnitureQty || 1);
+  const getProjectWorkDays = (p: SavedProject) => p.workDaysPerMonth !== undefined ? p.workDaysPerMonth : 25;
+
   // Sync default selection and initial quantities when modal opens
   useEffect(() => {
     if (isOpen) {
       const favIds = favoriteProjects.map(p => p.id);
       setSelectedIds(prev => (prev.length === 0 ? favIds : prev.filter(id => favIds.includes(id))));
       
-      // Default to 'monthly' mode with project.furnitureQty * workDaysPerMonth
+      // Default to 'monthly' mode with project.dailySales * workDaysPerMonth
       const initialQtys: Record<string, number> = {};
       favoriteProjects.forEach(p => {
-        const days = p.workDaysPerMonth || 25;
-        initialQtys[p.id] = (p.furnitureQty || 1) * days;
+        initialQtys[p.id] = getProjectDailySales(p) * getProjectWorkDays(p);
       });
       setQuantities(initialQtys);
       setCalculationMode('monthly');
@@ -97,14 +99,13 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
     if (mode === 'daily') {
       const dailyQtys: Record<string, number> = {};
       favoriteProjects.forEach(p => {
-        dailyQtys[p.id] = p.furnitureQty || 1;
+        dailyQtys[p.id] = getProjectDailySales(p);
       });
       setQuantities(dailyQtys);
     } else if (mode === 'monthly') {
       const monthlyQtys: Record<string, number> = {};
       favoriteProjects.forEach(p => {
-        const days = p.workDaysPerMonth || 25;
-        monthlyQtys[p.id] = (p.furnitureQty || 1) * days;
+        monthlyQtys[p.id] = getProjectDailySales(p) * getProjectWorkDays(p);
       });
       setQuantities(monthlyQtys);
     }
@@ -181,7 +182,10 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
     const backSheetW = proj.backSheetWidth || 2750;
     const backSheetH = proj.backSheetHeight || 1850;
 
-    const qtyPlanned = quantities[proj.id] || proj.furnitureQty || 1;
+    const workDays = proj.workDaysPerMonth !== undefined ? proj.workDaysPerMonth : 25;
+    const dailySales = proj.dailySales !== undefined ? proj.dailySales : (proj.furnitureQty || 1);
+    const defaultMonthly = dailySales * workDays;
+    const qtyPlanned = quantities[proj.id] !== undefined ? quantities[proj.id] : defaultMonthly;
 
     // Batch Packing for the planned quantity (qtyPlanned) of this project
     const batchPiecesToPack = pieces.map(p => ({
@@ -259,6 +263,9 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
       netMarginPercent,
       avgCompetitorPrice,
       qtyPlanned,
+      workDays,
+      dailySales,
+      defaultMonthly,
     };
   });
 
@@ -584,14 +591,20 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
                               )}
                               <div>
                                 <div className="text-sm font-extrabold text-slate-100">{item.proj.name}</div>
-                                <span className="text-[10px] text-slate-400 font-mono">
+                                <span className="text-[10px] text-slate-400 font-mono block">
                                   {item.piecesCount} peças • {item.totalEdgeTapeMetersUnit.toFixed(1)}m fita
+                                </span>
+                                <span className="text-[10px] text-amber-300 font-mono font-semibold block mt-0.5">
+                                  {item.dailySales} vendas/dia • {item.workDays} dias/mês
                                 </span>
                               </div>
                             </td>
 
                             <td className="p-3.5 text-center font-mono font-bold text-slate-100 text-sm">
-                              {item.qtyPlanned} un
+                              <div>{item.qtyPlanned} un</div>
+                              <span className="text-[10px] text-amber-300/90 font-mono font-normal block">
+                                ({item.dailySales} v/dia × {item.workDays}d)
+                              </span>
                             </td>
 
                             <td className="p-3.5 text-center font-mono text-slate-200">
@@ -768,9 +781,14 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
                       key={`qty-${item.proj.id}`}
                       className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-lg flex items-center justify-between gap-2"
                     >
-                      <span className="text-xs font-bold text-slate-200 truncate" title={item.proj.name}>
-                        {item.proj.name}
-                      </span>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-xs font-bold text-slate-200 truncate" title={item.proj.name}>
+                          {item.proj.name}
+                        </span>
+                        <span className="text-[10px] text-amber-300 font-mono font-semibold">
+                          {item.dailySales} v/dia × {item.workDays} dias/mês
+                        </span>
+                      </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => {

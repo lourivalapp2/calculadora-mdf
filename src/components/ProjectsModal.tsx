@@ -44,6 +44,7 @@ export interface SavedProject {
   includeFixedInMarkup?: boolean;
   selectedScenarioId?: string;
   fixedExpenses?: FixedExpense[];
+  dailySales?: number;
   isFavorite?: boolean;
 }
 

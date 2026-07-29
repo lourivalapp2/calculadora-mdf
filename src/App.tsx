@@ -144,7 +144,7 @@ export default function App() {
   const [selectedScenarioId, setSelectedScenarioId] = useState<string>('c2');
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>(defaultFixedExpenses);
   const [hideFixedExpensesInDre, setHideFixedExpensesInDre] = useState<boolean>(true);
-  const [simulateOneUnitPerDay, setSimulateOneUnitPerDay] = useState<boolean>(false);
+  const [dailySales, setDailySales] = useState<number>(1);
   const [newFixedExpense, setNewFixedExpense] = useState({ name: '', value: '' });
 
   // Cost Input State: Name, Unit Price, Quantity
@@ -337,6 +337,7 @@ export default function App() {
           if (activeProj.includeFixedInMarkup !== undefined) setIncludeFixedInMarkup(activeProj.includeFixedInMarkup);
           if (activeProj.selectedScenarioId) setSelectedScenarioId(activeProj.selectedScenarioId);
           if (activeProj.fixedExpenses) setFixedExpenses(activeProj.fixedExpenses);
+          if (activeProj.dailySales !== undefined) setDailySales(activeProj.dailySales);
           return;
         }
       }
@@ -360,6 +361,7 @@ export default function App() {
       const savedIncFixed = localStorage.getItem('mdf-include-fixed-in-markup');
       const savedScenId = localStorage.getItem('mdf-selected-scenario-id');
       const savedFixed = localStorage.getItem('mdf-fixed-expenses');
+      const savedDailySales = localStorage.getItem('mdf-daily-sales');
       const savedCompetitor = localStorage.getItem('mdf-competitor-items');
 
       if (savedName) setProjectName(savedName);
@@ -412,6 +414,7 @@ export default function App() {
       if (savedMargin) setTargetNetMargin(parseFloat(savedMargin) || 30);
       if (savedIncFixed !== null) setIncludeFixedInMarkup(savedIncFixed === 'true');
       if (savedScenId) setSelectedScenarioId(savedScenId);
+      if (savedDailySales) setDailySales(parseInt(savedDailySales) || 1);
       if (savedFixed) {
         try {
           const parsed = JSON.parse(savedFixed);
@@ -476,6 +479,7 @@ export default function App() {
             includeFixedInMarkup,
             selectedScenarioId,
             fixedExpenses: [...fixedExpenses],
+            dailySales,
           };
           const newList = [...prevList];
           newList[index] = updatedProj;
@@ -485,7 +489,7 @@ export default function App() {
         return prevList;
       });
     }
-  }, [projectName, pieces, costs, sheetWidth, sheetHeight, furnitureQty, furnitureImages, competitorItems, backPieces, backSheetWidth, backSheetHeight, salesScenarios, workDaysPerMonth, taxRate, mlFeeRate, targetNetMargin, includeFixedInMarkup, selectedScenarioId, fixedExpenses, currentProjectId]);
+  }, [projectName, pieces, costs, sheetWidth, sheetHeight, furnitureQty, furnitureImages, competitorItems, backPieces, backSheetWidth, backSheetHeight, salesScenarios, workDaysPerMonth, taxRate, mlFeeRate, targetNetMargin, includeFixedInMarkup, selectedScenarioId, fixedExpenses, dailySales, currentProjectId]);
 
   // Explicit Save Project to Browser / Supabase Cloud (with Auto-Save support)
   const handleSaveProjectToBrowser = useCallback(async (isAutoSave: boolean = false) => {
@@ -515,6 +519,7 @@ export default function App() {
       includeFixedInMarkup,
       selectedScenarioId,
       fixedExpenses: [...fixedExpenses],
+      dailySales,
       isFavorite: Boolean(existingProj?.isFavorite),
     };
 
@@ -543,7 +548,7 @@ export default function App() {
       setSaveToast(`Projeto "${projectToSave.name}" salvo com sucesso ${destinationText}! (${pieces.length} peças)`);
     }
     setTimeout(() => setSaveToast(null), 3500);
-  }, [currentProjectId, savedProjects, projectName, sheetWidth, sheetHeight, furnitureQty, pieces, costs, furnitureImages, competitorItems, backPieces, backSheetWidth, backSheetHeight, salesScenarios, workDaysPerMonth, taxRate, mlFeeRate, targetNetMargin, includeFixedInMarkup, selectedScenarioId, fixedExpenses]);
+  }, [currentProjectId, savedProjects, projectName, sheetWidth, sheetHeight, furnitureQty, pieces, costs, furnitureImages, competitorItems, backPieces, backSheetWidth, backSheetHeight, salesScenarios, workDaysPerMonth, taxRate, mlFeeRate, targetNetMargin, includeFixedInMarkup, selectedScenarioId, fixedExpenses, dailySales]);
 
   // Auto-Save Interval Effect (Every 1 Minute / 60,000 ms)
   useEffect(() => {
@@ -584,6 +589,7 @@ export default function App() {
     setIncludeFixedInMarkup(project.includeFixedInMarkup !== undefined ? project.includeFixedInMarkup : true);
     setSelectedScenarioId(project.selectedScenarioId || 'c2');
     setFixedExpenses(project.fixedExpenses ? [...project.fixedExpenses] : defaultFixedExpenses);
+    setDailySales(project.dailySales !== undefined ? project.dailySales : 1);
     setSelectedImageIndex(0);
 
     localStorage.setItem('mdf-current-project-id', project.id);
@@ -2917,7 +2923,7 @@ export default function App() {
               </p>
             </div>
 
-            {/* Inputs: Work Days & Tax Rate */}
+            {/* Inputs: Work Days, Vendas/Dia, Tax Rate & Highlighted Cenário */}
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded">
                 <span className="text-[11px] text-slate-300 font-semibold uppercase">Dias no Mês:</span>
@@ -2935,6 +2941,25 @@ export default function App() {
                     }
                   }}
                   className="bg-slate-950 text-amber-400 font-bold text-xs font-mono w-12 text-center rounded border border-slate-800 focus:outline-none"
+                />
+              </div>
+
+              {/* Campo para digitar Vendas por dia (Posicionado do lado direito de Dias no Mês) */}
+              <div className="flex items-center gap-1.5 bg-slate-900 border border-amber-500/50 px-2.5 py-1 rounded shadow-sm" title="Digite a quantidade de vendas desejada por dia">
+                <span className="text-[11px] text-amber-300 font-bold uppercase">Vendas/Dia:</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={dailySales === 0 ? '' : dailySales}
+                  onChange={e => {
+                    if (e.target.value === '') {
+                      setDailySales(0);
+                    } else {
+                      const val = parseInt(e.target.value);
+                      setDailySales(isNaN(val) ? 0 : Math.max(0, val));
+                    }
+                  }}
+                  className="bg-slate-950 text-amber-400 font-bold text-xs font-mono w-14 text-center rounded border border-amber-500/60 focus:outline-none focus:border-amber-400"
                 />
               </div>
 
@@ -2978,16 +3003,19 @@ export default function App() {
                 />
               </div>
 
-              {/* Active Scenario Selector for Monthly Projection */}
-              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded">
-                <span className="text-[11px] text-slate-300 font-semibold uppercase">Cenário:</span>
+              {/* Active Scenario Selector for Monthly Projection - Destaque visual destacado */}
+              <div className="flex items-center gap-2 bg-gradient-to-r from-amber-950 via-yellow-950 to-slate-950 border-2 border-amber-400 px-3 py-1.5 rounded-lg shadow-lg ring-2 ring-amber-500/40">
+                <span className="text-xs font-black text-amber-300 uppercase tracking-wide flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-400 animate-pulse" />
+                  CENÁRIO:
+                </span>
                 <select
                   value={selectedScenarioId}
                   onChange={e => setSelectedScenarioId(e.target.value)}
-                  className="bg-slate-950 text-emerald-400 font-bold text-xs rounded border border-slate-800 focus:outline-none py-0.5 px-1 cursor-pointer"
+                  className="bg-slate-950 text-amber-300 font-extrabold text-xs rounded border border-amber-500/70 focus:outline-none focus:ring-2 focus:ring-amber-400 py-1 px-2 cursor-pointer shadow-inner"
                 >
                   {salesScenarios.map((sc, i) => (
-                    <option key={sc.id} value={sc.id}>
+                    <option key={sc.id} value={sc.id} className="bg-slate-950 text-slate-100 font-medium">
                       {sc.name || `Cenário ${i + 1}`} (R$ {formatBRL(sc.unitPrice)})
                     </option>
                   ))}
@@ -3003,17 +3031,6 @@ export default function App() {
                   className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer"
                 />
                 <span>Ocultar Despesas Fixas</span>
-              </label>
-
-              {/* Toggle Simular 1 un/dia na DRE */}
-              <label className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded cursor-pointer select-none font-semibold hover:border-slate-600 transition-colors" title="Simular faturamento e custos considerando 1 unidade vendida por dia">
-                <input
-                  type="checkbox"
-                  checked={simulateOneUnitPerDay}
-                  onChange={e => setSimulateOneUnitPerDay(e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer"
-                />
-                <span>Calcular 1 un/dia</span>
               </label>
             </div>
           </div>
@@ -3109,8 +3126,7 @@ export default function App() {
             {(() => {
               const activeSc = salesScenarios.find(s => s.id === selectedScenarioId) || salesScenarios[0] || { unitPrice: 0, name: 'Cenário 1' };
               const unitCost = furnitureQty > 0 ? totalCost / furnitureQty : 0;
-              const dailyUnitsToCalc = simulateOneUnitPerDay ? 1 : furnitureQty;
-              const monthlyProductionCount = dailyUnitsToCalc * workDaysPerMonth;
+              const monthlyProductionCount = dailySales * workDaysPerMonth;
               const monthlyGrossRevenue = activeSc.unitPrice * monthlyProductionCount;
               const monthlyDirectCost = unitCost * monthlyProductionCount;
               const monthlyGrossProfit = monthlyGrossRevenue - monthlyDirectCost;
@@ -3130,7 +3146,7 @@ export default function App() {
                       <span>DRE - Demonstração do Resultado do Mês</span>
                     </h4>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      {workDaysPerMonth} dias × {dailyUnitsToCalc} {dailyUnitsToCalc === 1 ? 'móvel' : 'móveis'}/dia = <strong>{monthlyProductionCount} móveis/mês</strong>
+                      {workDaysPerMonth} dias × {dailySales} {dailySales === 1 ? 'venda' : 'vendas'}/dia = <strong>{monthlyProductionCount} vendas/mês</strong>
                     </span>
                   </div>
 
@@ -3175,18 +3191,30 @@ export default function App() {
                         ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
                         : 'bg-red-950/60 border-red-500/50 text-red-300'
                     }`}>
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center flex-wrap gap-2">
                         <div>
                           <span className="text-[10px] uppercase font-bold tracking-wider block">
                             {monthlyNetProfit >= 0 ? '🟢 LUCRO LÍQUIDO MENSAL FINAL:' : '🔴 RESULTADO MENSAL (PREJUÍZO):'}
                           </span>
-                          <span className="text-[11px] opacity-80">
+                          <span className="font-mono text-2xl font-extrabold tracking-tight block mt-0.5">
                             Margem Líquida: <strong>{monthlyNetMargin.toFixed(2)}%</strong>
                           </span>
                         </div>
                         <span className="font-mono text-2xl font-extrabold tracking-tight">
                           R$ {formatBRL(monthlyNetProfit)}
                         </span>
+                      </div>
+
+                      {/* Resumo Solicitado */}
+                      <div className="mt-3 pt-2.5 border-t border-slate-700/60 font-sans text-xs">
+                        <div className="font-bold text-amber-300 text-sm">
+                          {dailySales} vendas por dia
+                        </div>
+                        <div className="text-slate-200 font-semibold mt-1 flex items-center gap-3 flex-wrap">
+                          <span>total de <strong className="text-amber-400">{monthlyProductionCount}</strong> vendas por Mês</span>
+                          <span className="text-slate-500 font-normal">|</span>
+                          <span><strong className="text-amber-400">{workDaysPerMonth}</strong> dias mês</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3275,13 +3303,13 @@ export default function App() {
       {/* Botões de Ação e Salvar no Final da Página */}
       <div className="mt-8 bg-slate-900 border border-slate-800 p-6 rounded-lg shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400">
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400">
             <Save size={24} />
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
               <span>Salvar e Exportar Projeto</span>
-              <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded border border-amber-500/40">
+              <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/40">
                 {projectName}
               </span>
             </h3>
@@ -3293,8 +3321,8 @@ export default function App() {
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
           <button
-            onClick={handleSaveProjectToBrowser}
-            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-5 py-3 rounded-lg text-xs flex items-center justify-center gap-2 shadow-lg hover:shadow-amber-500/20 transition-all active:scale-95 cursor-pointer"
+            onClick={() => handleSaveProjectToBrowser(false)}
+            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-5 py-3 rounded-lg text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 border border-emerald-400/60 transition-all active:scale-95 cursor-pointer"
             title="Salvar este projeto no banco de dados Supabase"
           >
             <Save size={18} />
