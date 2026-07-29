@@ -166,32 +166,35 @@ export default function App() {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [isAiModalOpen, setIsAiModalOpen] = useState<boolean>(false);
 
-  const addCompetitorItem = () => {
+  const addCompetitorItem = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const priceVal = parseFloat(newCompetitorPrice.replace(',', '.')) || 0;
     let linkVal = newCompetitorLink.trim();
     if (linkVal && !/^https?:\/\//i.test(linkVal)) {
       linkVal = 'https://' + linkVal;
     }
     if (priceVal <= 0 && !linkVal) return;
-    if (competitorItems.length >= 5) {
+    if (Array.isArray(competitorItems) && competitorItems.length >= 5) {
       alert('Você pode cadastrar no máximo 5 valores de concorrentes.');
       return;
     }
 
-    setCompetitorItems(prev => [
-      ...prev,
-      {
-        id: `comp-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-        price: priceVal,
-        link: linkVal,
-      },
-    ]);
+    const newItem: CompetitorItem = {
+      id: `comp-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      price: isNaN(priceVal) ? 0 : priceVal,
+      link: linkVal,
+    };
+
+    setCompetitorItems(prev => [...(Array.isArray(prev) ? prev : []), newItem]);
     setNewCompetitorPrice('');
     setNewCompetitorLink('');
   };
 
   const removeCompetitorItem = (idToRemove: string) => {
-    setCompetitorItems(prev => prev.filter(item => item.id !== idToRemove));
+    setCompetitorItems(prev => (Array.isArray(prev) ? prev.filter(item => item && item.id !== idToRemove) : []));
   };
   
   // Multi-Project Manager State
@@ -357,6 +360,7 @@ export default function App() {
       const savedIncFixed = localStorage.getItem('mdf-include-fixed-in-markup');
       const savedScenId = localStorage.getItem('mdf-selected-scenario-id');
       const savedFixed = localStorage.getItem('mdf-fixed-expenses');
+      const savedCompetitor = localStorage.getItem('mdf-competitor-items');
 
       if (savedName) setProjectName(savedName);
       if (savedPieces) setPieces(JSON.parse(savedPieces));
@@ -375,6 +379,25 @@ export default function App() {
       if (savedBackPieces) setBackPieces(JSON.parse(savedBackPieces));
       if (savedBackWidth) setBackSheetWidth(parseInt(savedBackWidth));
       if (savedBackHeight) setBackSheetHeight(parseInt(savedBackHeight));
+      if (savedCompetitor) {
+        try {
+          const parsed = JSON.parse(savedCompetitor);
+          if (Array.isArray(parsed)) {
+            const sanitized = parsed.map((item: any, i: number) => {
+              if (typeof item === 'string') return { id: `comp-${Date.now()}-${i}`, price: 0, link: item };
+              if (typeof item === 'number') return { id: `comp-${Date.now()}-${i}`, price: item, link: '' };
+              return {
+                id: item?.id || `comp-${Date.now()}-${i}`,
+                price: typeof item?.price === 'number' ? item.price : (parseFloat(item?.price) || 0),
+                link: item?.link || '',
+              };
+            });
+            setCompetitorItems(sanitized);
+          }
+        } catch (e) {
+          console.error('Error loading competitor items:', e);
+        }
+      }
       if (savedSalesScenarios) {
         try {
           const parsed = JSON.parse(savedSalesScenarios);
@@ -2574,12 +2597,12 @@ export default function App() {
               <div className="flex items-center justify-between border-b border-slate-900 pb-2">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wide">
                   <Link className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Preços do Concorrente / Mercado Livre ({competitorItems.length}/5)</span>
+                  <span>Preços do Concorrente / Mercado Livre ({Array.isArray(competitorItems) ? competitorItems.length : 0}/5)</span>
                 </div>
               </div>
 
               {/* Form para cadastrar Valor do Concorrente + Link */}
-              {competitorItems.length < 5 && (
+              {(!Array.isArray(competitorItems) || competitorItems.length < 5) && (
                 <div className="flex gap-2 items-center flex-wrap sm:flex-nowrap">
                   <input
                     type="number"
@@ -2587,6 +2610,12 @@ export default function App() {
                     placeholder="Valor R$"
                     value={newCompetitorPrice}
                     onChange={e => setNewCompetitorPrice(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addCompetitorItem(e);
+                      }
+                    }}
                     className="bg-slate-900 border border-slate-800 p-2 rounded text-slate-200 text-xs w-28 text-center focus:outline-none focus:border-amber-500 font-mono"
                   />
                   <input
@@ -2597,12 +2626,13 @@ export default function App() {
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        addCompetitorItem();
+                        addCompetitorItem(e);
                       }
                     }}
                     className="bg-slate-900 border border-slate-800 p-2 rounded text-slate-200 text-xs flex-1 min-w-[130px] focus:outline-none focus:border-amber-500 font-mono"
                   />
                   <button
+                    type="button"
                     onClick={addCompetitorItem}
                     className="bg-amber-500 hover:bg-amber-400 text-black px-3 py-2 rounded text-xs font-bold transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap active:scale-95 shadow-sm"
                   >
@@ -2613,49 +2643,57 @@ export default function App() {
               )}
 
               {/* Lista de Valores de Concorrentes com Links Clicáveis */}
-              {competitorItems.length === 0 ? (
+              {!Array.isArray(competitorItems) || competitorItems.length === 0 ? (
                 <p className="text-[11px] text-slate-500 italic text-center py-1">
                   Nenhum preço de concorrente cadastrado. Digite o valor (R$) e o link acima para comparar.
                 </p>
               ) : (
                 <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                  {competitorItems.map((item, idx) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between bg-slate-900 border border-slate-800 px-3 py-2 rounded text-xs gap-2"
-                    >
-                      <div className="flex items-center gap-2 font-mono flex-1 min-w-0">
-                        <span className="text-slate-400 font-semibold text-[11px] whitespace-nowrap">
-                          Valor {idx + 1}:
-                        </span>
-                        <span className="text-amber-400 font-bold text-sm whitespace-nowrap">
-                          R$ {formatBRL(item.price)}
-                        </span>
-                        {item.link && (
-                          <>
-                            <span className="text-slate-600">→</span>
-                            <a
-                              href={item.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-emerald-400 hover:text-emerald-300 text-[11px] truncate flex items-center gap-1 hover:underline font-sans"
-                              title={item.link}
-                            >
-                              <ExternalLink className="w-3 h-3 flex-shrink-0 text-emerald-500" />
-                              <span className="truncate">{item.link}</span>
-                            </a>
-                          </>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => removeCompetitorItem(item.id)}
-                        className="text-slate-500 hover:text-red-400 p-1 transition-colors flex-shrink-0"
-                        title="Excluir este valor do concorrente"
+                  {competitorItems.map((item, idx) => {
+                    if (!item) return null;
+                    const itemPrice = typeof item.price === 'number' && !isNaN(item.price) ? item.price : (parseFloat(item.price as any) || 0);
+                    const itemLink = typeof item.link === 'string' ? item.link : '';
+                    const itemId = item.id || `comp-${idx}`;
+
+                    return (
+                      <div
+                        key={itemId}
+                        className="flex items-center justify-between bg-slate-900 border border-slate-800 px-3 py-2 rounded text-xs gap-2"
                       >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2 font-mono flex-1 min-w-0">
+                          <span className="text-slate-400 font-semibold text-[11px] whitespace-nowrap">
+                            Valor {idx + 1}:
+                          </span>
+                          <span className="text-amber-400 font-bold text-sm whitespace-nowrap">
+                            R$ {formatBRL(itemPrice)}
+                          </span>
+                          {itemLink && (
+                            <>
+                              <span className="text-slate-600">→</span>
+                              <a
+                                href={itemLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-400 hover:text-emerald-300 text-[11px] truncate flex items-center gap-1 hover:underline font-sans"
+                                title={itemLink}
+                              >
+                                <ExternalLink className="w-3 h-3 flex-shrink-0 text-emerald-500" />
+                                <span className="truncate">{itemLink}</span>
+                              </a>
+                            </>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeCompetitorItem(itemId)}
+                          className="text-slate-500 hover:text-red-400 p-1 transition-colors flex-shrink-0 cursor-pointer"
+                          title="Excluir este valor do concorrente"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

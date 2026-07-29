@@ -230,7 +230,9 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
     const netMarginPercent = targetPrice > 0 ? (netProfitUnit / targetPrice) * 100 : 0;
 
     // Competitor Price Average
-    const compPrices = (proj.competitorItems || []).map(c => c.price).filter(p => p > 0);
+    const compPrices = (Array.isArray(proj.competitorItems) ? proj.competitorItems : [])
+      .map(c => (typeof c === 'object' && c ? c.price : (typeof c === 'number' ? c : 0)))
+      .filter((p): p is number => typeof p === 'number' && !isNaN(p) && p > 0);
     const avgCompetitorPrice = compPrices.length > 0 
       ? compPrices.reduce((a, b) => a + b, 0) / compPrices.length 
       : 0;
@@ -309,7 +311,7 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
         </div>
       )}
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="printable-modal bg-slate-900 border border-slate-800 rounded-2xl max-w-6xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
@@ -331,8 +333,9 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 no-print">
             <button
+              type="button"
               onClick={() => window.print()}
               className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-md active:scale-95"
               title="Visualizar Impressão / Imprimir DRE Gerencial"
@@ -343,6 +346,7 @@ export const ExecutiveSummaryModal: React.FC<ExecutiveSummaryModalProps> = ({
             </button>
 
             <button
+              type="button"
               onClick={onClose}
               className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
             >
