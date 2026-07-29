@@ -330,7 +330,7 @@ export default function App() {
           if (activeProj.backSheetWidth) setBackSheetWidth(activeProj.backSheetWidth);
           if (activeProj.backSheetHeight) setBackSheetHeight(activeProj.backSheetHeight);
           if (activeProj.salesScenarios) setSalesScenarios(activeProj.salesScenarios);
-          if (activeProj.workDaysPerMonth) setWorkDaysPerMonth(activeProj.workDaysPerMonth);
+          if (activeProj.workDaysPerMonth !== undefined) setWorkDaysPerMonth(activeProj.workDaysPerMonth);
           if (activeProj.taxRate !== undefined) setTaxRate(activeProj.taxRate);
           if (activeProj.mlFeeRate !== undefined) setMlFeeRate(activeProj.mlFeeRate);
           if (activeProj.targetNetMargin !== undefined) setTargetNetMargin(activeProj.targetNetMargin);
@@ -408,13 +408,19 @@ export default function App() {
           console.error(e);
         }
       }
-      if (savedDays) setWorkDaysPerMonth(parseInt(savedDays) || 25);
+      if (savedDays !== null) {
+        const pDays = parseInt(savedDays);
+        setWorkDaysPerMonth(isNaN(pDays) ? 25 : pDays);
+      }
       if (savedTax) setTaxRate(parseFloat(savedTax) || 4.0);
       if (savedMlFee) setMlFeeRate(parseFloat(savedMlFee) || 0);
       if (savedMargin) setTargetNetMargin(parseFloat(savedMargin) || 30);
       if (savedIncFixed !== null) setIncludeFixedInMarkup(savedIncFixed === 'true');
       if (savedScenId) setSelectedScenarioId(savedScenId);
-      if (savedDailySales) setDailySales(parseInt(savedDailySales) || 1);
+      if (savedDailySales !== null) {
+        const pSales = parseInt(savedDailySales);
+        setDailySales(isNaN(pSales) ? 1 : pSales);
+      }
       if (savedFixed) {
         try {
           const parsed = JSON.parse(savedFixed);
@@ -582,7 +588,7 @@ export default function App() {
     setBackSheetWidth(project.backSheetWidth || 2750);
     setBackSheetHeight(project.backSheetHeight || 1850);
     setSalesScenarios(project.salesScenarios ? [...project.salesScenarios] : defaultSalesScenarios);
-    setWorkDaysPerMonth(project.workDaysPerMonth || 25);
+    setWorkDaysPerMonth(project.workDaysPerMonth !== undefined ? project.workDaysPerMonth : 25);
     setTaxRate(project.taxRate !== undefined ? project.taxRate : 8.0);
     setMlFeeRate(project.mlFeeRate !== undefined ? project.mlFeeRate : 30);
     setTargetNetMargin(project.targetNetMargin !== undefined ? project.targetNetMargin : 30);
@@ -605,6 +611,14 @@ export default function App() {
     localStorage.setItem('mdf-back-sheet-width', (project.backSheetWidth || 2750).toString());
     localStorage.setItem('mdf-back-sheet-height', (project.backSheetHeight || 1830).toString());
     localStorage.setItem('mdf-sales-scenarios', JSON.stringify(project.salesScenarios || defaultSalesScenarios));
+    localStorage.setItem('mdf-work-days', (project.workDaysPerMonth !== undefined ? project.workDaysPerMonth : 25).toString());
+    localStorage.setItem('mdf-daily-sales', (project.dailySales !== undefined ? project.dailySales : 1).toString());
+    localStorage.setItem('mdf-tax-rate', (project.taxRate !== undefined ? project.taxRate : 8.0).toString());
+    localStorage.setItem('mdf-ml-fee-rate', (project.mlFeeRate !== undefined ? project.mlFeeRate : 30).toString());
+    localStorage.setItem('mdf-target-net-margin', (project.targetNetMargin !== undefined ? project.targetNetMargin : 30).toString());
+    localStorage.setItem('mdf-include-fixed-in-markup', (project.includeFixedInMarkup !== undefined ? project.includeFixedInMarkup : true).toString());
+    localStorage.setItem('mdf-selected-scenario-id', project.selectedScenarioId || 'c2');
+    localStorage.setItem('mdf-fixed-expenses', JSON.stringify(project.fixedExpenses || defaultFixedExpenses));
 
     setSaveToast(`Projeto "${project.name}" carregado! (${(project.pieces || []).length} peças)`);
     setTimeout(() => setSaveToast(null), 3500);
@@ -675,6 +689,7 @@ export default function App() {
       includeFixedInMarkup,
       selectedScenarioId,
       fixedExpenses: [...fixedExpenses],
+      dailySales,
       isFavorite: newFavStatus,
     };
 
